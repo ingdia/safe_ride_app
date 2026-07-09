@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('SafeRide app test', () {
+  test('Driver feature test', () {
     expect(true, true);
   });
 }
