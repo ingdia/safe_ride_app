@@ -217,7 +217,7 @@ class _SummaryItem extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(ParentUiSpacing.sm),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.10),
+        color: color.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(ParentUiRadius.md),
       ),
       child: Row(

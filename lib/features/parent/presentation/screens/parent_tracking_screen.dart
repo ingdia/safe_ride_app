@@ -230,7 +230,7 @@ class _MockMapPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round;
 
     final thinRoadPaint = Paint()
-      ..color = Colors.white.withOpacity(0.7)
+      ..color = Colors.white.withValues(alpha: 0.7)
       ..strokeWidth = 4
       ..strokeCap = StrokeCap.round;
 

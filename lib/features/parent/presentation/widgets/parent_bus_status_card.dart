@@ -60,7 +60,7 @@ class ParentBusStatusCard extends StatelessWidget {
             child: LinearProgressIndicator(
               value: progress.clamp(0.0, 1.0),
               minHeight: 8,
-              backgroundColor: Colors.white.withOpacity(0.35),
+              backgroundColor: Colors.white.withValues(alpha: 0.35),
               valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
             ),
           ),
@@ -130,9 +130,9 @@ class ParentBusStatusCard extends StatelessWidget {
               vertical: ParentUiSpacing.sm,
             ),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.18),
+              color: Colors.white.withValues(alpha: 0.18),
               borderRadius: BorderRadius.circular(ParentUiRadius.md),
-              border: Border.all(color: Colors.white.withOpacity(0.35)),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
             ),
             child: Text(
               '$stopsAway stops away from your child',
@@ -196,7 +196,7 @@ class _Header extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: ParentUiTextStyles.caption.copyWith(
-                  color: Colors.white.withOpacity(0.88),
+                  color: Colors.white.withValues(alpha: 0.88),
                 ),
               ),
             ],
@@ -256,9 +256,9 @@ class _InfoTile extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(ParentUiSpacing.sm),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.16),
+        color: Colors.white.withValues(alpha: 0.16),
         borderRadius: BorderRadius.circular(ParentUiRadius.sm),
-        border: Border.all(color: Colors.white.withOpacity(0.25)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -268,7 +268,7 @@ class _InfoTile extends StatelessWidget {
           Text(
             title,
             style: ParentUiTextStyles.caption.copyWith(
-              color: Colors.white.withOpacity(0.78),
+              color: Colors.white.withValues(alpha: 0.78),
             ),
           ),
           const SizedBox(height: 2),
