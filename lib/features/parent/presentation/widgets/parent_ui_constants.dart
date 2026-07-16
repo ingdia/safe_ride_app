@@ -15,6 +15,7 @@ class ParentUiColors {
   static const Color warning = Color(0xFFF59E0B);
   static const Color danger = Color(0xFFDC2626);
   static const Color blue = Color(0xFF2563EB);
+  static const Color textSecondary = Color(0xFF6B7280);
 }
 
 class ParentUiSpacing {
