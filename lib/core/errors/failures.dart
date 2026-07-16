@@ -7,3 +7,7 @@ sealed class Failure {
 class AuthFailure extends Failure {
   const AuthFailure(super.message);
 }
+
+class EmergencyFailure extends Failure {
+  const EmergencyFailure(super.message);
+}
