@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../domain/models/route_stop.dart';
+import '../bloc/driver_route_bloc.dart';
+import '../bloc/driver_route_state.dart';
 
 /// Driver's "Today's Route" screen.
 ///
@@ -16,74 +19,63 @@ import '../../domain/models/route_stop.dart';
 class TodaysRouteScreen extends StatelessWidget {
   const TodaysRouteScreen({super.key});
 
-  // TODO(Task 2): Replace with data from DriverRouteBloc / DriverRepository.
+  // TODO(Task 2): Replace with real route metadata from the bloc when available.
   static const String _routeName = 'Route A';
   static const String _busNumber = 'Bus #12';
-  static final List<RouteStop> _mockStops = [
-    RouteStop(
-      order: 1,
-      name: 'Oak Street',
-      studentCount: 3,
-      time: '7:45 AM',
-    ),
-    RouteStop(
-      order: 2,
-      name: 'Maple Avenue',
-      studentCount: 2,
-      time: '7:52 AM',
-    ),
-    RouteStop(
-      order: 3,
-      name: 'Cedar Lane',
-      studentCount: 4,
-      time: '8:00 AM',
-    ),
-    RouteStop(
-      order: 4,
-      name: 'Birch Court',
-      studentCount: 1,
-      time: '8:07 AM',
-    ),
-    RouteStop(
-      order: 5,
-      name: 'Kigali Parents School',
-      studentCount: 0,
-      time: '8:15 AM',
-      isDestination: true,
-    ),
-  ];
 
-  int get _totalStudents =>
-      _mockStops.fold(0, (sum, stop) => sum + stop.studentCount);
+  int _totalStudents(List<RouteStop> stops) =>
+      stops.fold(0, (sum, stop) => sum + stop.studentCount);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
-        child: CustomScrollView(
-          slivers: [
-            SliverToBoxAdapter(child: _buildHeader(context)),
-            SliverToBoxAdapter(child: _buildRouteSummaryCard(context)),
-            SliverToBoxAdapter(child: _buildStopsHeader(context)),
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.md,
-              ),
-              sliver: SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) => _RouteStopTile(
-                    stop: _mockStops[index],
-                    onTap: () => _showStopDetails(context, _mockStops[index]),
+        child: BlocBuilder<DriverRouteBloc, DriverRouteState>(
+          builder: (context, state) {
+            if (state is DriverRouteLoading || state is DriverRouteInitial) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            if (state is DriverRouteError) {
+              return Center(
+                child: Text(
+                  'Unable to load route: ${state.message}',
+                  textAlign: TextAlign.center,
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: AppColors.textSecondary,
                   ),
-                  childCount: _mockStops.length,
                 ),
-              ),
-            ),
-            SliverToBoxAdapter(
-              child: SizedBox(height: AppSpacing.xl + AppSpacing.xxl),
-            ),
-          ],
+              );
+            }
+
+            final stops = (state as DriverRouteLoaded).stops;
+
+            return CustomScrollView(
+              slivers: [
+                SliverToBoxAdapter(child: _buildHeader(context)),
+                SliverToBoxAdapter(child: _buildRouteSummaryCard(context, stops)),
+                SliverToBoxAdapter(child: _buildStopsHeader(context, stops)),
+                SliverPadding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.md,
+                  ),
+                  sliver: SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) => _RouteStopTile(
+                        stop: stops[index],
+                        onTap: () => _showStopDetails(context, stops[index]),
+                      ),
+                      childCount: stops.length,
+                    ),
+                  ),
+                ),
+                SliverToBoxAdapter(
+                  child: SizedBox(height: AppSpacing.xl + AppSpacing.xxl),
+                ),
+              ],
+            );
+          },
         ),
       ),
       floatingActionButton: _buildStartRouteButton(context),
@@ -137,7 +129,7 @@ class TodaysRouteScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildRouteSummaryCard(BuildContext context) {
+  Widget _buildRouteSummaryCard(BuildContext context, List<RouteStop> stops) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
       child: Container(
@@ -187,19 +179,19 @@ class TodaysRouteScreen extends StatelessWidget {
                 _SummaryStat(
                   icon: Icons.location_on_outlined,
                   label: 'Stops',
-                  value: '${_mockStops.length}',
+                  value: '${stops.length}',
                 ),
                 const SizedBox(width: AppSpacing.lg),
                 _SummaryStat(
                   icon: Icons.groups_outlined,
                   label: 'Students',
-                  value: '$_totalStudents',
+                  value: '${_totalStudents(stops)}',
                 ),
                 const SizedBox(width: AppSpacing.lg),
                 _SummaryStat(
                   icon: Icons.schedule_outlined,
                   label: 'First Stop',
-                  value: _mockStops.first.time,
+                  value: stops.first.time,
                 ),
               ],
             ),
@@ -209,7 +201,7 @@ class TodaysRouteScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildStopsHeader(BuildContext context) {
+  Widget _buildStopsHeader(BuildContext context, List<RouteStop> stops) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.md,
@@ -222,7 +214,7 @@ class TodaysRouteScreen extends StatelessWidget {
         children: [
           Text('Route Stops', style: AppTextStyles.headingSmall),
           Text(
-            '${_mockStops.length} stops',
+            '${stops.length} stops',
             style: AppTextStyles.bodySmall.copyWith(
               color: AppColors.textSecondary,
             ),
