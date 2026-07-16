@@ -9,7 +9,7 @@ import 'driver_route_state.dart';
 class DriverRouteBloc extends Bloc<DriverRouteEvent, DriverRouteState> {
   DriverRouteBloc({required this.repository}) : super(const DriverRouteInitial()) {
     on<LoadDriverRoute>(_onLoadDriverRoute);
-    on<MarkStudentAttendance>(_onMarkStudentAttendance);
+    on<UpdateStudentAttendanceStatus>(_onUpdateStudentAttendanceStatus);
   }
 
   final DriverRepository repository;
@@ -28,8 +28,8 @@ class DriverRouteBloc extends Bloc<DriverRouteEvent, DriverRouteState> {
     }
   }
 
-  Future<void> _onMarkStudentAttendance(
-    MarkStudentAttendance event,
+  Future<void> _onUpdateStudentAttendanceStatus(
+    UpdateStudentAttendanceStatus event,
     Emitter<DriverRouteState> emit,
   ) async {
     final currentState = state;

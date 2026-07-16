@@ -12,8 +12,8 @@ class UpdateRouteStops extends DriverRouteEvent {
   const UpdateRouteStops();
 }
 
-class MarkStudentAttendance extends DriverRouteEvent {
-  const MarkStudentAttendance({
+class UpdateStudentAttendanceStatus extends DriverRouteEvent {
+  const UpdateStudentAttendanceStatus({
     required this.studentId,
     required this.status,
   });
