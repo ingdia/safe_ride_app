@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/routing/app_router.dart';
-import 'features/auth/presentation/screens/login_screen.dart';
 import 'features/parent/presentation/widgets/parent_ui_constants.dart';
 
 void main() {
@@ -35,8 +34,13 @@ class SafeRideApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const SplashScreen(),
-      onGenerateRoute: AppRouter.onGenerateRoute,
+      initialRoute: '/',
+      onGenerateRoute: (settings) {
+        if (settings.name == '/') {
+          return MaterialPageRoute(builder: (_) => const SplashScreen());
+        }
+        return AppRouter.onGenerateRoute(settings);
+      },
     );
   }
 }
@@ -74,17 +78,7 @@ class _SplashScreenState extends State<SplashScreen>
 
     Future.delayed(const Duration(milliseconds: 2400), () {
       if (!mounted) return;
-      Navigator.pushReplacement(
-        context,
-        PageRouteBuilder(
-          pageBuilder: (_, _, _) => const LoginScreen(),
-          transitionsBuilder: (_, animation, _, child) => FadeTransition(
-            opacity: animation,
-            child: child,
-          ),
-          transitionDuration: const Duration(milliseconds: 500),
-        ),
-      );
+      Navigator.pushReplacementNamed(context, '/auth/login');
     });
   }
 
