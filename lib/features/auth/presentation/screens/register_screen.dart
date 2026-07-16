@@ -68,7 +68,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: ParentUiSpacing.lg),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               const SizedBox(height: ParentUiSpacing.xl),
               const _RegisterHeader(),
@@ -99,11 +99,12 @@ class _RegisterHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Container(
           height: 60,
           width: 60,
+          alignment: Alignment.center,
           decoration: BoxDecoration(
             gradient: const LinearGradient(
               colors: [ParentUiColors.orange, ParentUiColors.darkOrange],
@@ -129,11 +130,13 @@ class _RegisterHeader extends StatelessWidget {
         Text(
           'Create account',
           style: ParentUiTextStyles.title.copyWith(fontSize: 28),
+          textAlign: TextAlign.center,
         ),
         const SizedBox(height: ParentUiSpacing.xs),
         Text(
           'Join SafeRide and keep your child safe',
           style: ParentUiTextStyles.caption.copyWith(fontSize: 14),
+          textAlign: TextAlign.center,
         ),
       ],
     );

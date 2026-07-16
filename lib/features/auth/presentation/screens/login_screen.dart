@@ -64,7 +64,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: ParentUiSpacing.lg),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               const SizedBox(height: ParentUiSpacing.xl),
               const _AuthHeader(),
@@ -93,11 +93,12 @@ class _AuthHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Container(
           height: 60,
           width: 60,
+          alignment: Alignment.center,
           decoration: BoxDecoration(
             gradient: const LinearGradient(
               colors: [ParentUiColors.orange, ParentUiColors.darkOrange],
@@ -123,11 +124,13 @@ class _AuthHeader extends StatelessWidget {
         Text(
           'Welcome back',
           style: ParentUiTextStyles.title.copyWith(fontSize: 28),
+          textAlign: TextAlign.center,
         ),
         const SizedBox(height: ParentUiSpacing.xs),
         Text(
           'Sign in to track your child safely',
           style: ParentUiTextStyles.caption.copyWith(fontSize: 14),
+          textAlign: TextAlign.center,
         ),
       ],
     );
