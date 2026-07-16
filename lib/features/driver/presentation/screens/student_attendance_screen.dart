@@ -30,7 +30,7 @@ class StudentAttendanceScreen extends StatelessWidget {
     };
 
     context.read<DriverRouteBloc>().add(
-          MarkStudentAttendance(
+          UpdateStudentAttendanceStatus(
             studentId: student.id,
             status: next,
           ),
