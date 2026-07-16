@@ -5,6 +5,7 @@ import '../../../../../shared/widgets/app_navigation_shell.dart';
 import '../providers/admin_navigation_provider.dart';
 import 'admin_dashboard_screen.dart';
 import 'admin_buses_screen.dart';
+import 'admin_emergency_screen.dart';
 import 'admin_users_screen.dart';
 import 'admin_settings_screen.dart';
 
@@ -28,6 +29,11 @@ class AdminNavigationShell extends ConsumerWidget {
       label: 'Users',
     ),
     AppNavItem(
+      icon: Icons.emergency_outlined,
+      activeIcon: Icons.emergency_rounded,
+      label: 'Emergency',
+    ),
+    AppNavItem(
       icon: Icons.settings_outlined,
       activeIcon: Icons.settings_rounded,
       label: 'Settings',
@@ -38,6 +44,7 @@ class AdminNavigationShell extends ConsumerWidget {
     AdminDashboardScreen(),
     AdminBusesScreen(),
     AdminUsersScreen(),
+    AdminEmergencyScreen(),
     AdminSettingsScreen(),
   ];
 
