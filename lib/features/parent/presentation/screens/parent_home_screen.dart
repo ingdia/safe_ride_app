@@ -1,15 +1,48 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../domain/entities/parent_dashboard_entity.dart';
+import '../../domain/entities/parent_notification_entity.dart';
+import '../../domain/entities/parent_trip_entity.dart';
+import '../providers/parent_data_providers.dart';
 import '../widgets/parent_bus_status_card.dart';
 import '../widgets/parent_notification_tile.dart';
 import '../widgets/parent_ui_constants.dart';
 import '../widgets/route_stop_tile.dart';
 
-class ParentHomeScreen extends StatelessWidget {
+class ParentHomeScreen extends ConsumerWidget {
   const ParentHomeScreen({super.key});
 
   @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final dashboardState = ref.watch(parentDashboardProvider);
+
+    return dashboardState.when(
+      loading: () => const _ParentLoadingView(),
+      error: (error, stackTrace) {
+        return _ParentErrorView(
+          message: 'Failed to load parent dashboard.',
+          onRetry: () {
+            ref.invalidate(parentDashboardProvider);
+          },
+        );
+      },
+      data: (dashboard) {
+        return _ParentHomeContent(dashboard: dashboard);
+      },
+    );
+  }
+}
+
+class _ParentHomeContent extends StatelessWidget {
+  const _ParentHomeContent({required this.dashboard});
+
+  final ParentDashboardEntity dashboard;
+
+  @override
   Widget build(BuildContext context) {
+    final trip = dashboard.trip;
+
     return Scaffold(
       backgroundColor: ParentUiColors.background,
       body: SafeArea(
@@ -32,20 +65,27 @@ class ParentHomeScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const _ParentHeader(),
+                      _ParentHeader(parentName: dashboard.parentName),
                       const SizedBox(height: ParentUiSpacing.lg),
-                      const ParentBusStatusCard(
-                        childName: 'Ineza Juliette',
-                        busNumber: 'Bus KGL 204',
-                        status: 'On time',
-                        currentStop: 'Kacyiru',
-                        nextStop: 'Kimironko',
-                        eta: '12 min',
-                        stopsAway: 2,
-                        progress: 0.64,
+                      ParentBusStatusCard(
+                        childName: trip.childName,
+                        busNumber: trip.busNumber,
+                        status: trip.statusLabel,
+                        currentStop: trip.currentStop,
+                        nextStop: trip.nextStop,
+                        eta: trip.eta,
+                        stopsAway: trip.stopsAway,
+                        progress: trip.progress,
+                        isOnTime: trip.isOnTime,
                       ),
                       const SizedBox(height: ParentUiSpacing.lg),
-                      const _ChildSummaryCard(),
+                      _ChildSummaryCard(
+                        childName: dashboard.childName,
+                        schoolName: dashboard.schoolName,
+                        grade: dashboard.grade,
+                        statusLabel: trip.statusLabel,
+                        isSafe: trip.status != ParentTripStatus.emergency,
+                      ),
                       const SizedBox(height: ParentUiSpacing.lg),
                       const _SectionHeader(
                         title: 'Quick actions',
@@ -59,56 +99,44 @@ class ParentHomeScreen extends StatelessWidget {
                         actionText: 'View map',
                       ),
                       const SizedBox(height: ParentUiSpacing.sm),
-                      const _MapPreviewCard(),
+                      _MapPreviewCard(eta: trip.eta),
                       const SizedBox(height: ParentUiSpacing.lg),
                       const _SectionHeader(
                         title: 'Today route',
                         actionText: '',
                       ),
                       const SizedBox(height: ParentUiSpacing.sm),
-                      const RouteStopTile(
-                        stopName: 'Kacyiru pickup point',
-                        time: '07:10',
-                        status: RouteStopStatus.completed,
-                        position: 1,
-                        isLast: false,
-                      ),
-                      const RouteStopTile(
-                        stopName: 'Kimironko main road',
-                        time: '07:25',
-                        status: RouteStopStatus.current,
-                        position: 2,
-                        isLast: false,
-                      ),
-                      const RouteStopTile(
-                        stopName: 'School gate',
-                        time: '07:45',
-                        status: RouteStopStatus.upcoming,
-                        position: 3,
-                        isLast: true,
-                      ),
+                      ...trip.routeStops.map((stop) {
+                        return RouteStopTile(
+                          stopName: stop.name,
+                          time: stop.time,
+                          status: _routeStopStatusFromEntity(stop.status),
+                          position: stop.position,
+                          isLast: stop.position == trip.routeStops.length,
+                        );
+                      }),
                       const SizedBox(height: ParentUiSpacing.lg),
                       const _SectionHeader(
                         title: 'Recent notifications',
                         actionText: 'See all',
                       ),
                       const SizedBox(height: ParentUiSpacing.sm),
-                      const ParentNotificationTile(
-                        title: 'Child boarded',
-                        message:
-                            'Ineza boarded Bus KGL 204 at Kacyiru pickup point.',
-                        time: '7:10 AM',
-                        type: ParentNotificationType.boarded,
-                      ),
-                      const SizedBox(height: ParentUiSpacing.sm),
-                      const ParentNotificationTile(
-                        title: 'Bus is moving',
-                        message:
-                            'The bus is currently heading to Kimironko main road.',
-                        time: '7:18 AM',
-                        type: ParentNotificationType.general,
-                        isRead: true,
-                      ),
+                      ...dashboard.recentNotifications.map((notification) {
+                        return Padding(
+                          padding: const EdgeInsets.only(
+                            bottom: ParentUiSpacing.sm,
+                          ),
+                          child: ParentNotificationTile(
+                            title: notification.title,
+                            message: notification.message,
+                            time: notification.time,
+                            type: _notificationTypeFromEntity(
+                              notification.type,
+                            ),
+                            isRead: notification.isRead,
+                          ),
+                        );
+                      }),
                     ],
                   ),
                 ),
@@ -119,10 +147,38 @@ class ParentHomeScreen extends StatelessWidget {
       ),
     );
   }
+
+  RouteStopStatus _routeStopStatusFromEntity(ParentRouteStopStatus status) {
+    switch (status) {
+      case ParentRouteStopStatus.completed:
+        return RouteStopStatus.completed;
+      case ParentRouteStopStatus.current:
+        return RouteStopStatus.current;
+      case ParentRouteStopStatus.upcoming:
+        return RouteStopStatus.upcoming;
+    }
+  }
+
+  ParentNotificationType _notificationTypeFromEntity(ParentAlertType type) {
+    switch (type) {
+      case ParentAlertType.boarded:
+        return ParentNotificationType.boarded;
+      case ParentAlertType.dropped:
+        return ParentNotificationType.dropped;
+      case ParentAlertType.delay:
+        return ParentNotificationType.delay;
+      case ParentAlertType.emergency:
+        return ParentNotificationType.emergency;
+      case ParentAlertType.general:
+        return ParentNotificationType.general;
+    }
+  }
 }
 
 class _ParentHeader extends StatelessWidget {
-  const _ParentHeader();
+  const _ParentHeader({required this.parentName});
+
+  final String parentName;
 
   @override
   Widget build(BuildContext context) {
@@ -133,7 +189,7 @@ class _ParentHeader extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Good morning, Parent',
+                'Good morning, $parentName',
                 style: ParentUiTextStyles.caption.copyWith(
                   fontWeight: FontWeight.w700,
                 ),
@@ -166,10 +222,24 @@ class _ParentHeader extends StatelessWidget {
 }
 
 class _ChildSummaryCard extends StatelessWidget {
-  const _ChildSummaryCard();
+  const _ChildSummaryCard({
+    required this.childName,
+    required this.schoolName,
+    required this.grade,
+    required this.statusLabel,
+    required this.isSafe,
+  });
+
+  final String childName;
+  final String schoolName;
+  final String grade;
+  final String statusLabel;
+  final bool isSafe;
 
   @override
   Widget build(BuildContext context) {
+    final badgeColor = isSafe ? ParentUiColors.success : ParentUiColors.danger;
+
     return Container(
       decoration: parentCardDecoration(),
       padding: const EdgeInsets.all(ParentUiSpacing.md),
@@ -193,10 +263,10 @@ class _ChildSummaryCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Ineza Juliette', style: ParentUiTextStyles.heading),
+                Text(childName, style: ParentUiTextStyles.heading),
                 const SizedBox(height: 4),
                 Text(
-                  'Primary 4 • Kigali Parents School',
+                  '$grade • $schoolName',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: ParentUiTextStyles.caption,
@@ -211,13 +281,13 @@ class _ChildSummaryCard extends StatelessWidget {
               vertical: ParentUiSpacing.xs,
             ),
             decoration: BoxDecoration(
-              color: const Color(0xFFE8F8EE),
+              color: badgeColor.withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(100),
             ),
             child: Text(
-              'Safe',
+              statusLabel,
               style: ParentUiTextStyles.caption.copyWith(
-                color: ParentUiColors.success,
+                color: badgeColor,
                 fontWeight: FontWeight.w900,
               ),
             ),
@@ -345,7 +415,9 @@ class _QuickActionCard extends StatelessWidget {
 }
 
 class _MapPreviewCard extends StatelessWidget {
-  const _MapPreviewCard();
+  const _MapPreviewCard({required this.eta});
+
+  final String eta;
 
   @override
   Widget build(BuildContext context) {
@@ -433,7 +505,7 @@ class _MapPreviewCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(100),
               ),
               child: Text(
-                'ETA 12 min',
+                'ETA $eta',
                 style: ParentUiTextStyles.caption.copyWith(
                   color: ParentUiColors.darkOrange,
                   fontWeight: FontWeight.w900,
@@ -497,6 +569,60 @@ class _SectionHeader extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+class _ParentLoadingView extends StatelessWidget {
+  const _ParentLoadingView();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      backgroundColor: ParentUiColors.background,
+      body: Center(
+        child: CircularProgressIndicator(color: ParentUiColors.orange),
+      ),
+    );
+  }
+}
+
+class _ParentErrorView extends StatelessWidget {
+  const _ParentErrorView({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: ParentUiColors.background,
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(ParentUiSpacing.lg),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.error_outline_rounded,
+                color: ParentUiColors.danger,
+                size: 42,
+              ),
+              const SizedBox(height: ParentUiSpacing.md),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: ParentUiTextStyles.body,
+              ),
+              const SizedBox(height: ParentUiSpacing.md),
+              ElevatedButton(
+                onPressed: onRetry,
+                child: const Text('Try again'),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
