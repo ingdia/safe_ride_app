@@ -6,6 +6,7 @@ import '../providers/driver_navigation_provider.dart';
 import 'driver_dashboard_screen.dart';
 import 'driver_route_screen.dart';
 import 'driver_profile_screen.dart';
+import 'driver_sos_screen.dart';
 
 class DriverNavigationShell extends ConsumerWidget {
   const DriverNavigationShell({super.key});
@@ -22,6 +23,12 @@ class DriverNavigationShell extends ConsumerWidget {
       label: 'My Route',
     ),
     AppNavItem(
+      icon: Icons.emergency_outlined,
+      activeIcon: Icons.emergency_rounded,
+      label: 'SOS',
+      badgeCount: 0,
+    ),
+    AppNavItem(
       icon: Icons.person_outline_rounded,
       activeIcon: Icons.person_rounded,
       label: 'Profile',
@@ -31,6 +38,7 @@ class DriverNavigationShell extends ConsumerWidget {
   static const _screens = [
     DriverDashboardScreen(),
     DriverRouteScreen(),
+    DriverSosScreen(),
     DriverProfileScreen(),
   ];
 
