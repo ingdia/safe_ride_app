@@ -1,21 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../features/parent/presentation/widgets/parent_ui_constants.dart';
+import '../../domain/entities/emergency_alert.dart';
+import '../providers/sos_provider.dart';
 import '../widgets/sos_button.dart';
 
-enum _SosScreenState { idle, loading, success, cancelled }
-
-class DriverSosScreen extends StatefulWidget {
+class DriverSosScreen extends ConsumerStatefulWidget {
   const DriverSosScreen({super.key});
 
   @override
-  State<DriverSosScreen> createState() => _DriverSosScreenState();
+  ConsumerState<DriverSosScreen> createState() => _DriverSosScreenState();
 }
 
-class _DriverSosScreenState extends State<DriverSosScreen>
+class _DriverSosScreenState extends ConsumerState<DriverSosScreen>
     with SingleTickerProviderStateMixin {
-  _SosScreenState _screenState = _SosScreenState.idle;
-
   late final AnimationController _feedbackController;
   late final Animation<double> _feedbackFade;
   late final Animation<Offset> _feedbackSlide;
@@ -46,9 +45,7 @@ class _DriverSosScreenState extends State<DriverSosScreen>
     super.dispose();
   }
 
-  void _onSosPressed() {
-    _showConfirmationDialog();
-  }
+  void _onSosPressed() => _showConfirmationDialog();
 
   Future<void> _showConfirmationDialog() async {
     final confirmed = await showDialog<bool>(
@@ -60,37 +57,39 @@ class _DriverSosScreenState extends State<DriverSosScreen>
     if (!mounted) return;
 
     if (confirmed == true) {
-      _triggerSos();
+      ref.read(sosProvider.notifier).triggerSos(
+            driverName: 'Bob Driver',
+            vehicle: 'KGL 204 B',
+            emergencyType: EmergencyType.other,
+          );
     } else {
-      _setCancelled();
+      ref.read(sosProvider.notifier).cancel();
+      _feedbackController
+        ..reset()
+        ..forward();
     }
-  }
-
-  Future<void> _triggerSos() async {
-    setState(() => _screenState = _SosScreenState.loading);
-    _feedbackController.reset();
-
-    // Simulated delay — will be replaced by provider call in Phase 3
-    await Future.delayed(const Duration(milliseconds: 1800));
-
-    if (!mounted) return;
-    setState(() => _screenState = _SosScreenState.success);
-    _feedbackController.forward();
-  }
-
-  void _setCancelled() {
-    setState(() => _screenState = _SosScreenState.cancelled);
-    _feedbackController.reset();
-    _feedbackController.forward();
-  }
-
-  void _reset() {
-    setState(() => _screenState = _SosScreenState.idle);
-    _feedbackController.reset();
   }
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<SosState>(sosProvider, (_, next) {
+      if (next is SosSuccess || next is SosCancelled) {
+        _feedbackController
+          ..reset()
+          ..forward();
+      }
+      if (next is SosError) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text((next).message),
+            backgroundColor: ParentUiColors.danger,
+          ),
+        );
+      }
+    });
+
+    final sosState = ref.watch(sosProvider);
+
     return Scaffold(
       backgroundColor: ParentUiColors.background,
       body: SafeArea(
@@ -99,7 +98,7 @@ class _DriverSosScreenState extends State<DriverSosScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _SosHeader(screenState: _screenState),
+              _SosHeader(sosState: sosState),
               const Spacer(),
               Center(
                 child: AnimatedSwitcher(
@@ -110,32 +109,31 @@ class _DriverSosScreenState extends State<DriverSosScreen>
                     scale: animation,
                     child: FadeTransition(opacity: animation, child: child),
                   ),
-                  child: _screenState == _SosScreenState.success
-                      ? _FeedbackCard(
-                          key: const ValueKey('success'),
-                          fade: _feedbackFade,
-                          slide: _feedbackSlide,
-                          isSuccess: true,
-                          onReset: _reset,
-                        )
-                      : _screenState == _SosScreenState.cancelled
-                          ? _FeedbackCard(
-                              key: const ValueKey('cancelled'),
-                              fade: _feedbackFade,
-                              slide: _feedbackSlide,
-                              isSuccess: false,
-                              onReset: _reset,
-                            )
-                          : SosButton(
-                              key: const ValueKey('button'),
-                              onPressed: _onSosPressed,
-                              isLoading:
-                                  _screenState == _SosScreenState.loading,
-                            ),
+                  child: switch (sosState) {
+                    SosSuccess() => _FeedbackCard(
+                        key: const ValueKey('success'),
+                        fade: _feedbackFade,
+                        slide: _feedbackSlide,
+                        isSuccess: true,
+                        onReset: () => ref.read(sosProvider.notifier).reset(),
+                      ),
+                    SosCancelled() => _FeedbackCard(
+                        key: const ValueKey('cancelled'),
+                        fade: _feedbackFade,
+                        slide: _feedbackSlide,
+                        isSuccess: false,
+                        onReset: () => ref.read(sosProvider.notifier).reset(),
+                      ),
+                    _ => SosButton(
+                        key: const ValueKey('button'),
+                        onPressed: _onSosPressed,
+                        isLoading: sosState is SosLoading,
+                      ),
+                  },
                 ),
               ),
               const Spacer(),
-              _SosInfoRow(screenState: _screenState),
+              _SosInfoRow(sosState: sosState),
               const SizedBox(height: ParentUiSpacing.md),
             ],
           ),
@@ -150,8 +148,8 @@ class _DriverSosScreenState extends State<DriverSosScreen>
 // ---------------------------------------------------------------------------
 
 class _SosHeader extends StatelessWidget {
-  const _SosHeader({required this.screenState});
-  final _SosScreenState screenState;
+  const _SosHeader({required this.sosState});
+  final SosState sosState;
 
   @override
   Widget build(BuildContext context) {
@@ -180,7 +178,7 @@ class _SosHeader extends StatelessWidget {
             Text('Emergency SOS', style: ParentUiTextStyles.title),
             const SizedBox(height: 2),
             Text(
-              screenState == _SosScreenState.success
+              sosState is SosSuccess
                   ? 'Alert sent — help is on the way'
                   : 'Press only in a real emergency',
               style: ParentUiTextStyles.caption,
@@ -216,8 +214,7 @@ class _FeedbackCard extends StatelessWidget {
     final bgColor = isSuccess
         ? ParentUiColors.danger.withValues(alpha: 0.08)
         : Colors.grey.withValues(alpha: 0.08);
-    final icon =
-        isSuccess ? Icons.check_circle_rounded : Icons.cancel_rounded;
+    final icon = isSuccess ? Icons.check_circle_rounded : Icons.cancel_rounded;
     final title = isSuccess ? 'SOS Alert Sent!' : 'SOS Cancelled';
     final subtitle = isSuccess
         ? 'Emergency services and school admin have been notified.\nStay calm — help is on the way.'
@@ -286,12 +283,12 @@ class _FeedbackCard extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _SosInfoRow extends StatelessWidget {
-  const _SosInfoRow({required this.screenState});
-  final _SosScreenState screenState;
+  const _SosInfoRow({required this.sosState});
+  final SosState sosState;
 
   @override
   Widget build(BuildContext context) {
-    if (screenState == _SosScreenState.success) {
+    if (sosState is SosSuccess) {
       return _InfoChip(
         icon: Icons.access_time_rounded,
         label: 'Alert sent at ${_formattedNow()}',
