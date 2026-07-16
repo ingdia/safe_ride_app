@@ -45,8 +45,6 @@ class _DriverSosScreenState extends ConsumerState<DriverSosScreen>
     super.dispose();
   }
 
-  void _onSosPressed() => _showConfirmationDialog();
-
   Future<void> _showConfirmationDialog() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -64,9 +62,6 @@ class _DriverSosScreenState extends ConsumerState<DriverSosScreen>
           );
     } else {
       ref.read(sosProvider.notifier).cancel();
-      _feedbackController
-        ..reset()
-        ..forward();
     }
   }
 
@@ -126,7 +121,7 @@ class _DriverSosScreenState extends ConsumerState<DriverSosScreen>
                       ),
                     _ => SosButton(
                         key: const ValueKey('button'),
-                        onPressed: _onSosPressed,
+                        onPressed: _showConfirmationDialog,
                         isLoading: sosState is SosLoading,
                       ),
                   },
