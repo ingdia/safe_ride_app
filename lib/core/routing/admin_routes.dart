@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../features/admin/presentation/screens/admin_dashboard_screen.dart';
+import '../../features/admin/presentation/screens/admin_navigation_shell.dart';
 
 class AdminRoutes {
   const AdminRoutes._();
@@ -11,7 +11,7 @@ class AdminRoutes {
     switch (settings.name) {
       case dashboard:
         return MaterialPageRoute(
-          builder: (_) => const AdminDashboardScreen(),
+          builder: (_) => const AdminNavigationShell(),
           settings: settings,
         );
 

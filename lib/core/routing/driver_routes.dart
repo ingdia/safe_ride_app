@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../features/driver/presentation/screens/driver_dashboard_screen.dart';
+import '../../features/driver/presentation/screens/driver_navigation_shell.dart';
 
 class DriverRoutes {
   const DriverRoutes._();
@@ -11,7 +11,7 @@ class DriverRoutes {
     switch (settings.name) {
       case dashboard:
         return MaterialPageRoute(
-          builder: (_) => const DriverDashboardScreen(),
+          builder: (_) => const DriverNavigationShell(),
           settings: settings,
         );
 
