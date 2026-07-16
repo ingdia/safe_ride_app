@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../domain/entities/parent_trip_entity.dart';
 import '../providers/parent_data_providers.dart';
 import '../widgets/parent_ui_constants.dart';
-import '../widgets/route_stop_tile.dart';
 
 class ParentTrackingScreen extends ConsumerWidget {
   const ParentTrackingScreen({super.key});
@@ -39,99 +38,245 @@ class _TrackingContent extends StatelessWidget {
     return Scaffold(
       backgroundColor: ParentUiColors.background,
       body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final horizontalPadding = constraints.maxWidth > 600
-                ? ParentUiSpacing.xl
-                : ParentUiSpacing.md;
-
-            return SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(
-                horizontalPadding,
-                ParentUiSpacing.md,
-                horizontalPadding,
-                ParentUiSpacing.xl,
-              ),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 720),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const _TrackingHeader(),
-                      const SizedBox(height: ParentUiSpacing.lg),
-                      _LiveMapCard(trip: trip),
-                      const SizedBox(height: ParentUiSpacing.lg),
-                      _TripInfoCard(trip: trip),
-                      const SizedBox(height: ParentUiSpacing.lg),
-                      Text('Route progress', style: ParentUiTextStyles.heading),
-                      const SizedBox(height: ParentUiSpacing.sm),
-                      ...trip.routeStops.map((stop) {
-                        return RouteStopTile(
-                          stopName: stop.name,
-                          time: stop.time,
-                          status: _routeStopStatusFromEntity(stop.status),
-                          position: stop.position,
-                          isLast: stop.position == trip.routeStops.length,
-                        );
-                      }),
-                    ],
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 720),
+            child: Column(
+              children: [
+                const _MapHeader(),
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      children: [
+                        _MapPreview(trip: trip),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(
+                            ParentUiSpacing.lg,
+                            ParentUiSpacing.lg,
+                            ParentUiSpacing.lg,
+                            ParentUiSpacing.xl,
+                          ),
+                          child: Column(
+                            children: [
+                              _RouteStopsHeader(
+                                stopCount: trip.routeStops.length,
+                              ),
+                              const SizedBox(height: ParentUiSpacing.md),
+                              ...trip.routeStops.map((stop) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(
+                                    bottom: ParentUiSpacing.md,
+                                  ),
+                                  child: _RouteStopCard(stop: stop),
+                                );
+                              }),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            );
-          },
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
+}
 
-  RouteStopStatus _routeStopStatusFromEntity(ParentRouteStopStatus status) {
-    switch (status) {
-      case ParentRouteStopStatus.completed:
-        return RouteStopStatus.completed;
-      case ParentRouteStopStatus.current:
-        return RouteStopStatus.current;
-      case ParentRouteStopStatus.upcoming:
-        return RouteStopStatus.upcoming;
-    }
+class _MapHeader extends StatelessWidget {
+  const _MapHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(
+        ParentUiSpacing.lg,
+        ParentUiSpacing.xl,
+        ParentUiSpacing.lg,
+        ParentUiSpacing.lg,
+      ),
+      color: ParentUiColors.orange,
+      child: const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Live Map',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 29,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          SizedBox(height: 8),
+          Text(
+            'Real-time bus tracking',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
-class _TrackingHeader extends StatelessWidget {
-  const _TrackingHeader();
+class _MapPreview extends StatelessWidget {
+  const _MapPreview({required this.trip});
+
+  final ParentTripEntity trip;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 400,
+      width: double.infinity,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFFFFFBEB), Color(0xFFFFF4C7)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+        border: Border(bottom: BorderSide(color: Color(0xFFFFD65A), width: 4)),
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          const Positioned(
+            left: 120,
+            top: 120,
+            child: _SmallMapDot(color: ParentUiColors.success),
+          ),
+          const Positioned(
+            left: 230,
+            top: 176,
+            child: _SmallMapDot(color: ParentUiColors.orange),
+          ),
+          const Positioned(
+            right: 210,
+            top: 215,
+            child: _SmallMapDot(color: ParentUiColors.success),
+          ),
+          const Positioned(
+            right: 170,
+            top: 252,
+            child: _SmallMapDot(color: ParentUiColors.textSecondary),
+          ),
+          Container(
+            width: 258,
+            padding: const EdgeInsets.symmetric(
+              horizontal: ParentUiSpacing.lg,
+              vertical: ParentUiSpacing.xl,
+            ),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.10),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    const Icon(
+                      Icons.navigation_outlined,
+                      color: ParentUiColors.orange,
+                      size: 86,
+                    ),
+                    Container(
+                      height: 62,
+                      width: 62,
+                      decoration: const BoxDecoration(
+                        color: ParentUiColors.orange,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.directions_bus_rounded,
+                        color: Colors.white,
+                        size: 32,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: ParentUiSpacing.md),
+                Text(
+                  'Interactive Map View',
+                  textAlign: TextAlign.center,
+                  style: ParentUiTextStyles.heading.copyWith(fontSize: 20),
+                ),
+                const SizedBox(height: ParentUiSpacing.xs),
+                Text(
+                  'GPS tracking visualization',
+                  textAlign: TextAlign.center,
+                  style: ParentUiTextStyles.body.copyWith(
+                    color: ParentUiColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SmallMapDot extends StatelessWidget {
+  const _SmallMapDot({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 14,
+      width: 14,
+      decoration: BoxDecoration(
+        color: color,
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.25),
+            blurRadius: 10,
+            spreadRadius: 2,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RouteStopsHeader extends StatelessWidget {
+  const _RouteStopsHeader({required this.stopCount});
+
+  final int stopCount;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Container(
-          height: 50,
-          width: 50,
-          decoration: BoxDecoration(
-            color: ParentUiColors.lightOrange,
-            borderRadius: BorderRadius.circular(ParentUiRadius.md),
-          ),
-          child: const Icon(
-            Icons.location_on_outlined,
-            color: ParentUiColors.orange,
+        Expanded(
+          child: Text(
+            'Route Stops',
+            style: ParentUiTextStyles.heading.copyWith(fontSize: 24),
           ),
         ),
-        const SizedBox(width: ParentUiSpacing.md),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Live tracking',
-                style: ParentUiTextStyles.title.copyWith(height: 1.1),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Follow the school bus in real time',
-                style: ParentUiTextStyles.caption,
-              ),
-            ],
+        Text(
+          '$stopCount stops',
+          style: ParentUiTextStyles.body.copyWith(
+            color: ParentUiColors.textSecondary,
           ),
         ),
       ],
@@ -139,246 +284,155 @@ class _TrackingHeader extends StatelessWidget {
   }
 }
 
-class _LiveMapCard extends StatelessWidget {
-  const _LiveMapCard({required this.trip});
+class _RouteStopCard extends StatelessWidget {
+  const _RouteStopCard({required this.stop});
 
-  final ParentTripEntity trip;
+  final ParentRouteStopEntity stop;
 
   @override
   Widget build(BuildContext context) {
+    final statusStyle = _statusStyle(stop.status);
+
     return Container(
-      height: 320,
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFE7C2),
-        borderRadius: BorderRadius.circular(ParentUiRadius.xl),
-        border: Border.all(color: ParentUiColors.border),
-      ),
-      child: Stack(
-        children: [
-          Positioned(
-            left: 24,
-            top: 52,
-            right: 24,
-            child: _MapRoadLine(width: double.infinity),
-          ),
-          Positioned(
-            left: 62,
-            top: 132,
-            right: 48,
-            child: _MapRoadLine(width: double.infinity),
-          ),
-          Positioned(
-            left: 28,
-            bottom: 62,
-            right: 92,
-            child: _MapRoadLine(width: double.infinity),
-          ),
-          const Positioned(
-            left: 34,
-            top: 94,
-            child: _MapMarker(
-              icon: Icons.home_rounded,
-              color: ParentUiColors.blue,
-            ),
-          ),
-          const Positioned(
-            right: 54,
-            top: 82,
-            child: _MapMarker(
-              icon: Icons.directions_bus_rounded,
-              color: ParentUiColors.orange,
-              size: 62,
-            ),
-          ),
-          const Positioned(
-            left: 96,
-            bottom: 42,
-            child: _MapMarker(
-              icon: Icons.school_rounded,
-              color: ParentUiColors.success,
-            ),
-          ),
-          Positioned(
-            left: ParentUiSpacing.md,
-            right: ParentUiSpacing.md,
-            bottom: ParentUiSpacing.md,
-            child: Container(
-              padding: const EdgeInsets.all(ParentUiSpacing.md),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(ParentUiRadius.lg),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.08),
-                    blurRadius: 16,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.directions_bus_filled_rounded,
-                    color: ParentUiColors.orange,
-                  ),
-                  const SizedBox(width: ParentUiSpacing.sm),
-                  Expanded(
-                    child: Text(
-                      '${trip.busNumber} is near ${trip.currentStop}',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: ParentUiTextStyles.body.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: ParentUiSpacing.sm),
-                  Text(
-                    trip.eta,
-                    style: ParentUiTextStyles.body.copyWith(
-                      color: ParentUiColors.darkOrange,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TripInfoCard extends StatelessWidget {
-  const _TripInfoCard({required this.trip});
-
-  final ParentTripEntity trip;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: parentCardDecoration(),
-      padding: const EdgeInsets.all(ParentUiSpacing.md),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Current trip', style: ParentUiTextStyles.heading),
-          const SizedBox(height: ParentUiSpacing.md),
-          _TripInfoRow(
-            icon: Icons.person_outline_rounded,
-            label: 'Child',
-            value: trip.childName,
-          ),
-          _TripInfoRow(
-            icon: Icons.directions_bus_outlined,
-            label: 'Bus',
-            value: trip.busNumber,
-          ),
-          _TripInfoRow(
-            icon: Icons.person_pin_outlined,
-            label: 'Driver',
-            value: trip.driverName,
-          ),
-          _TripInfoRow(
-            icon: Icons.near_me_outlined,
-            label: 'Next stop',
-            value: trip.nextStop,
-          ),
-          _TripInfoRow(
-            icon: Icons.timer_outlined,
-            label: 'ETA',
-            value: '${trip.eta} • ${trip.stopsAway} stops away',
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TripInfoRow extends StatelessWidget {
-  const _TripInfoRow({
-    required this.icon,
-    required this.label,
-    required this.value,
-  });
-
-  final IconData icon;
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: ParentUiSpacing.sm),
-      child: Row(
-        children: [
-          Icon(icon, color: ParentUiColors.orange, size: 22),
-          const SizedBox(width: ParentUiSpacing.sm),
-          Expanded(child: Text(label, style: ParentUiTextStyles.caption)),
-          const SizedBox(width: ParentUiSpacing.sm),
-          Flexible(
-            child: Text(
-              value,
-              textAlign: TextAlign.end,
-              style: ParentUiTextStyles.body.copyWith(
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MapRoadLine extends StatelessWidget {
-  const _MapRoadLine({required this.width});
-
-  final double width;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 6,
-      width: width,
+      padding: const EdgeInsets.all(ParentUiSpacing.lg),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(100),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: statusStyle.borderColor, width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            height: 52,
+            width: 52,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: statusStyle.circleColor,
+              shape: BoxShape.circle,
+            ),
+            child: Text(
+              stop.position.toString(),
+              style: TextStyle(
+                color: statusStyle.numberColor,
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+          const SizedBox(width: ParentUiSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  stop.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: ParentUiTextStyles.heading.copyWith(fontSize: 19),
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.location_on_outlined,
+                      size: 18,
+                      color: ParentUiColors.textSecondary,
+                    ),
+                    const SizedBox(width: 3),
+                    Expanded(
+                      child: Text(
+                        stop.time,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: ParentUiTextStyles.body.copyWith(
+                          color: ParentUiColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: ParentUiSpacing.sm),
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: ParentUiSpacing.md,
+              vertical: ParentUiSpacing.xs,
+            ),
+            decoration: BoxDecoration(
+              color: statusStyle.badgeBackground,
+              borderRadius: BorderRadius.circular(100),
+            ),
+            child: Text(
+              statusStyle.label,
+              style: ParentUiTextStyles.caption.copyWith(
+                color: statusStyle.badgeText,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ],
       ),
     );
+  }
+
+  _RouteStopStatusStyle _statusStyle(ParentRouteStopStatus status) {
+    switch (status) {
+      case ParentRouteStopStatus.completed:
+        return const _RouteStopStatusStyle(
+          label: 'Completed',
+          borderColor: Color(0xFF86EFAC),
+          circleColor: Color(0xFFDCFCE7),
+          numberColor: Color(0xFF15803D),
+          badgeBackground: Color(0xFFDCFCE7),
+          badgeText: Color(0xFF16A34A),
+        );
+      case ParentRouteStopStatus.current:
+        return const _RouteStopStatusStyle(
+          label: 'Current',
+          borderColor: ParentUiColors.orange,
+          circleColor: ParentUiColors.lightOrange,
+          numberColor: ParentUiColors.darkOrange,
+          badgeBackground: ParentUiColors.lightOrange,
+          badgeText: ParentUiColors.darkOrange,
+        );
+      case ParentRouteStopStatus.upcoming:
+        return const _RouteStopStatusStyle(
+          label: 'Upcoming',
+          borderColor: ParentUiColors.border,
+          circleColor: Color(0xFFF3F4F6),
+          numberColor: ParentUiColors.textSecondary,
+          badgeBackground: Color(0xFFF3F4F6),
+          badgeText: ParentUiColors.textSecondary,
+        );
+    }
   }
 }
 
-class _MapMarker extends StatelessWidget {
-  const _MapMarker({required this.icon, required this.color, this.size = 48});
+class _RouteStopStatusStyle {
+  const _RouteStopStatusStyle({
+    required this.label,
+    required this.borderColor,
+    required this.circleColor,
+    required this.numberColor,
+    required this.badgeBackground,
+    required this.badgeText,
+  });
 
-  final IconData icon;
-  final Color color;
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0.88, end: 1),
-      duration: const Duration(milliseconds: 700),
-      curve: Curves.easeOutBack,
-      builder: (context, value, child) {
-        return Transform.scale(scale: value, child: child);
-      },
-      child: Container(
-        height: size,
-        width: size,
-        decoration: BoxDecoration(
-          color: color,
-          shape: BoxShape.circle,
-          border: Border.all(color: Colors.white, width: 4),
-        ),
-        child: Icon(icon, color: Colors.white, size: size * 0.48),
-      ),
-    );
-  }
+  final String label;
+  final Color borderColor;
+  final Color circleColor;
+  final Color numberColor;
+  final Color badgeBackground;
+  final Color badgeText;
 }
 
 class _TrackingLoadingView extends StatelessWidget {
@@ -417,7 +471,7 @@ class _TrackingErrorView extends StatelessWidget {
               ),
               const SizedBox(height: ParentUiSpacing.md),
               Text(
-                'Failed to load live tracking.',
+                'Failed to load live map.',
                 textAlign: TextAlign.center,
                 style: ParentUiTextStyles.body,
               ),
