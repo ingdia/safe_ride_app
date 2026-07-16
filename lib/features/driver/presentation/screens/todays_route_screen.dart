@@ -12,11 +12,11 @@ import '../../domain/models/route_stop.dart';
 /// per the Driver Action user-flow, Fig. 5).
 ///
 /// NOTE: Data is currently static/mocked. This will be wired to
-
+/// `DriverRouteBloc` in Task 2 (feature/driver-bloc) — see the TODOs below.
 class TodaysRouteScreen extends StatelessWidget {
   const TodaysRouteScreen({super.key});
 
-
+  // TODO(Task 2): Replace with data from DriverRouteBloc / DriverRepository.
   static const String _routeName = 'Route A';
   static const String _busNumber = 'Bus #12';
   static final List<RouteStop> _mockStops = [
@@ -74,6 +74,7 @@ class TodaysRouteScreen extends StatelessWidget {
                 delegate: SliverChildBuilderDelegate(
                   (context, index) => _RouteStopTile(
                     stop: _mockStops[index],
+                    onTap: () => _showStopDetails(context, _mockStops[index]),
                   ),
                   childCount: _mockStops.length,
                 ),
@@ -116,10 +117,20 @@ class TodaysRouteScreen extends StatelessWidget {
               ),
             ],
           ),
-          CircleAvatar(
-            radius: 22,
-            backgroundColor: AppColors.primary.withOpacity(0.15),
-            child: const Icon(Icons.person, color: AppColors.primary),
+          // Tappable profile avatar — meets 44x44 min tap target via the
+          // InkWell's built-in splash bounds matching the CircleAvatar.
+          Material(
+            color: Colors.transparent,
+            shape: const CircleBorder(),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: () => _showProfileMenu(context),
+              child: CircleAvatar(
+                radius: 22,
+                backgroundColor: AppColors.primary.withOpacity(0.15),
+                child: const Icon(Icons.person, color: AppColors.primary),
+              ),
+            ),
           ),
         ],
       ),
@@ -229,7 +240,8 @@ class TodaysRouteScreen extends StatelessWidget {
         height: AppSpacing.tapTargetMin + 8, // >= 48dp Material tap target
         child: ElevatedButton.icon(
           onPressed: () {
-            
+            // TODO(Task 2): Check GPS status via DriverRouteBloc,
+            // then navigate to the Active Route screen (Fig. 5 flow).
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('Starting route…')),
             );
@@ -246,6 +258,101 @@ class TodaysRouteScreen extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  // TODO(Task 2): Replace with real navigation to a stop-detail /
+  // student-manifest screen once DriverRouteBloc is wired up.
+  void _showStopDetails(BuildContext context, RouteStop stop) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(AppSpacing.radiusLg),
+        ),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    stop.isDestination
+                        ? Icons.flag_rounded
+                        : Icons.location_on_rounded,
+                    color: stop.isDestination
+                        ? AppColors.success
+                        : AppColors.primary,
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Text(stop.name, style: AppTextStyles.headingSmall),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                'Scheduled time: ${stop.time}',
+                style: AppTextStyles.bodyMedium.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              if (!stop.isDestination)
+                Padding(
+                  padding: const EdgeInsets.only(top: AppSpacing.xs),
+                  child: Text(
+                    '${stop.studentCount} student'
+                    '${stop.studentCount == 1 ? '' : 's'} to pick up',
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+              const SizedBox(height: AppSpacing.md),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // TODO(Task 2): Wire to real profile/settings/logout actions.
+  void _showProfileMenu(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(AppSpacing.radiusLg),
+        ),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.person_outline),
+                title: const Text('Profile'),
+                onTap: () => Navigator.pop(context),
+              ),
+              ListTile(
+                leading: const Icon(Icons.settings_outlined),
+                title: const Text('Settings'),
+                onTap: () => Navigator.pop(context),
+              ),
+              ListTile(
+                leading: const Icon(Icons.logout_rounded),
+                title: const Text('Log out'),
+                onTap: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -290,80 +397,97 @@ class _SummaryStat extends StatelessWidget {
 
 /// A single stop row in the route list.
 ///
-/// Extracted as a private widget here for now; move to
+/// Now tappable via InkWell — tapping opens a bottom sheet with stop
+/// details. Extracted as a private widget here for now; move to
 /// `widgets/route_stop_tile.dart` if it ends up reused elsewhere
 /// (e.g. on the Driver Map screen).
 class _RouteStopTile extends StatelessWidget {
-  const _RouteStopTile({required this.stop});
+  const _RouteStopTile({required this.stop, required this.onTap});
 
   final RouteStop stop;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-      padding: const EdgeInsets.all(AppSpacing.sm),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
         border: Border.all(color: AppColors.border),
       ),
-      child: Row(
-        children: [
-          // Numbered circle — meets 48x48 minimum tap target since the
-          // whole tile is tappable via InkWell below in a future pass.
-          Container(
-            width: AppSpacing.tapTargetMin,
-            height: AppSpacing.tapTargetMin,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: stop.isDestination
-                  ? AppColors.success.withOpacity(0.15)
-                  : AppColors.primary.withOpacity(0.12),
-              shape: BoxShape.circle,
-            ),
-            child: Text(
-              '${stop.order}',
-              style: AppTextStyles.bodyMedium.copyWith(
-                fontWeight: FontWeight.w700,
-                color: stop.isDestination
-                    ? AppColors.success
-                    : AppColors.primary,
-              ),
-            ),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      clipBehavior: Clip.antiAlias,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.sm),
+            child: Row(
               children: [
-                Text(stop.name, style: AppTextStyles.bodyMedium),
-                if (!stop.isDestination)
-                  Text(
-                    '${stop.studentCount} student'
-                    '${stop.studentCount == 1 ? '' : 's'}',
-                    style: AppTextStyles.bodySmall.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
-                  )
-                else
-                  Text(
-                    'Final destination',
-                    style: AppTextStyles.bodySmall.copyWith(
-                      color: AppColors.textSecondary,
+                // Numbered circle — meets 48x48 minimum tap target as part
+                // of the tile's overall InkWell tap area.
+                Container(
+                  width: AppSpacing.tapTargetMin,
+                  height: AppSpacing.tapTargetMin,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: stop.isDestination
+                        ? AppColors.success.withOpacity(0.15)
+                        : AppColors.primary.withOpacity(0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Text(
+                    '${stop.order}',
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: stop.isDestination
+                          ? AppColors.success
+                          : AppColors.primary,
                     ),
                   ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(stop.name, style: AppTextStyles.bodyMedium),
+                      if (!stop.isDestination)
+                        Text(
+                          '${stop.studentCount} student'
+                          '${stop.studentCount == 1 ? '' : 's'}',
+                          style: AppTextStyles.bodySmall.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                        )
+                      else
+                        Text(
+                          'Final destination',
+                          style: AppTextStyles.bodySmall.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                Text(
+                  stop.time,
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: AppColors.textSecondary,
+                  size: 20,
+                ),
               ],
             ),
           ),
-          Text(
-            stop.time,
-            style: AppTextStyles.bodySmall.copyWith(
-              color: AppColors.textSecondary,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
