@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'features/auth/presentation/screens/forgot_password_screen.dart';
+import 'core/routing/app_router.dart';
 import 'features/parent/presentation/widgets/parent_ui_constants.dart';
 
 void main() {
@@ -34,7 +34,8 @@ class SafeRideApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const ForgotPasswordScreen(),
+      initialRoute: AppRouter.initial,
+      onGenerateRoute: AppRouter.onGenerateRoute,
     );
   }
 }

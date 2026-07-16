@@ -1,20 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../features/parent/presentation/widgets/parent_ui_constants.dart';
+import '../providers/auth_provider.dart';
 import '../widgets/auth_primary_button.dart';
 import '../widgets/auth_text_field.dart';
 
-class ForgotPasswordScreen extends StatefulWidget {
+class ForgotPasswordScreen extends ConsumerStatefulWidget {
   const ForgotPasswordScreen({super.key});
 
   @override
-  State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
+  ConsumerState<ForgotPasswordScreen> createState() =>
+      _ForgotPasswordScreenState();
 }
 
-class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
+class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
-  bool _submitted = false;
 
   @override
   void dispose() {
@@ -22,15 +24,31 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     super.dispose();
   }
 
-  void _onSubmit() {
-    if (_formKey.currentState?.validate() ?? false) {
-      // Provider logic will be wired in Phase 5
-      setState(() => _submitted = true);
-    }
+  Future<void> _onSubmit() async {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+    await ref.read(authProvider.notifier).forgotPassword(
+          email: _emailController.text,
+        );
   }
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<AuthState>(authProvider, (_, state) {
+      if (state is AuthError) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(state.message),
+            backgroundColor: ParentUiColors.danger,
+          ),
+        );
+        ref.read(authProvider.notifier).clearError();
+      }
+    });
+
+    final authState = ref.watch(authProvider);
+    final isLoading = authState is AuthLoading;
+    final isSuccess = authState is AuthPasswordResetSent;
+
     return Scaffold(
       backgroundColor: ParentUiColors.background,
       body: SafeArea(
@@ -42,15 +60,16 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               const SizedBox(height: ParentUiSpacing.xl),
               const _ForgotPasswordHeader(),
               const SizedBox(height: ParentUiSpacing.xl),
-              _submitted
+              isSuccess
                   ? const _SuccessCard()
                   : _ForgotPasswordCard(
                       formKey: _formKey,
                       emailController: _emailController,
                       onSubmit: _onSubmit,
+                      isLoading: isLoading,
                     ),
               const SizedBox(height: ParentUiSpacing.lg),
-              const _BackToLoginRow(),
+              _BackToLoginRow(),
               const SizedBox(height: ParentUiSpacing.xl),
             ],
           ),
@@ -112,11 +131,13 @@ class _ForgotPasswordCard extends StatelessWidget {
     required this.formKey,
     required this.emailController,
     required this.onSubmit,
+    required this.isLoading,
   });
 
   final GlobalKey<FormState> formKey;
   final TextEditingController emailController;
   final VoidCallback onSubmit;
+  final bool isLoading;
 
   @override
   Widget build(BuildContext context) {
@@ -153,6 +174,7 @@ class _ForgotPasswordCard extends StatelessWidget {
             AuthPrimaryButton(
               label: 'Send reset link',
               onPressed: onSubmit,
+              isLoading: isLoading,
             ),
           ],
         ),
@@ -243,9 +265,7 @@ class _BackToLoginRow extends StatelessWidget {
           style: ParentUiTextStyles.caption.copyWith(fontSize: 13),
         ),
         GestureDetector(
-          onTap: () {
-            // Navigate to login — wired in Phase 7
-          },
+          onTap: () => Navigator.pop(context),
           child: Text(
             'Sign in',
             style: ParentUiTextStyles.caption.copyWith(

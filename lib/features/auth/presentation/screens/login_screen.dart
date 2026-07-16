@@ -1,17 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/routing/app_router.dart';
+import '../../../../core/routing/auth_routes.dart';
 import '../../../../features/parent/presentation/widgets/parent_ui_constants.dart';
+import '../providers/auth_provider.dart';
 import '../widgets/auth_primary_button.dart';
 import '../widgets/auth_text_field.dart';
 
-class LoginScreen extends StatefulWidget {
+class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -23,14 +27,37 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _onLogin() {
-    if (_formKey.currentState?.validate() ?? false) {
-      // Provider logic will be wired in Phase 5
-    }
+  Future<void> _onLogin() async {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+    await ref.read(authProvider.notifier).login(
+          email: _emailController.text,
+          password: _passwordController.text,
+        );
   }
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<AuthState>(authProvider, (_, state) {
+      if (state is AuthAuthenticated) {
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          AppRouter.dashboardForRole(state.user.role),
+          (_) => false,
+        );
+      } else if (state is AuthError) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(state.message),
+            backgroundColor: ParentUiColors.danger,
+          ),
+        );
+        ref.read(authProvider.notifier).clearError();
+      }
+    });
+
+    final authState = ref.watch(authProvider);
+    final isLoading = authState is AuthLoading;
+
     return Scaffold(
       backgroundColor: ParentUiColors.background,
       body: SafeArea(
@@ -47,6 +74,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 emailController: _emailController,
                 passwordController: _passwordController,
                 onLogin: _onLogin,
+                isLoading: isLoading,
               ),
               const SizedBox(height: ParentUiSpacing.lg),
               const _RegisterRow(),
@@ -112,12 +140,14 @@ class _LoginCard extends StatelessWidget {
     required this.emailController,
     required this.passwordController,
     required this.onLogin,
+    required this.isLoading,
   });
 
   final GlobalKey<FormState> formKey;
   final TextEditingController emailController;
   final TextEditingController passwordController;
   final VoidCallback onLogin;
+  final bool isLoading;
 
   @override
   Widget build(BuildContext context) {
@@ -150,6 +180,7 @@ class _LoginCard extends StatelessWidget {
               prefixIcon: Icons.lock_outline_rounded,
               obscure: true,
               textInputAction: TextInputAction.done,
+              onFieldSubmitted: (_) => onLogin(),
               validator: (v) {
                 if (v == null || v.isEmpty) return 'Password is required';
                 if (v.length < 8) return 'Minimum 8 characters';
@@ -160,9 +191,10 @@ class _LoginCard extends StatelessWidget {
             Align(
               alignment: Alignment.centerRight,
               child: GestureDetector(
-                onTap: () {
-                  // Navigate to forgot password — wired in Phase 7
-                },
+                onTap: () => Navigator.pushNamed(
+                  context,
+                  AuthRoutes.forgotPassword,
+                ),
                 child: Text(
                   'Forgot password?',
                   style: ParentUiTextStyles.caption.copyWith(
@@ -176,6 +208,7 @@ class _LoginCard extends StatelessWidget {
             AuthPrimaryButton(
               label: 'Sign in',
               onPressed: onLogin,
+              isLoading: isLoading,
             ),
           ],
         ),
@@ -197,9 +230,7 @@ class _RegisterRow extends StatelessWidget {
           style: ParentUiTextStyles.caption.copyWith(fontSize: 13),
         ),
         GestureDetector(
-          onTap: () {
-            // Navigate to register — wired in Phase 7
-          },
+          onTap: () => Navigator.pushNamed(context, AuthRoutes.register),
           child: Text(
             'Sign up',
             style: ParentUiTextStyles.caption.copyWith(
