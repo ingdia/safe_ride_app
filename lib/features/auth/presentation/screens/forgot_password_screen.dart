@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/utils/validators.dart';
 import '../../../../features/parent/presentation/widgets/parent_ui_constants.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/auth_primary_button.dart';
@@ -69,7 +70,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                       isLoading: isLoading,
                     ),
               const SizedBox(height: ParentUiSpacing.lg),
-              _BackToLoginRow(),
+              const _BackToLoginRow(),
               const SizedBox(height: ParentUiSpacing.xl),
             ],
           ),
@@ -163,12 +164,7 @@ class _ForgotPasswordCard extends StatelessWidget {
               keyboardType: TextInputType.emailAddress,
               textInputAction: TextInputAction.done,
               onFieldSubmitted: (_) => onSubmit(),
-              validator: (v) {
-                if (v == null || v.trim().isEmpty) return 'Email is required';
-                final emailRegex = RegExp(r'^[\w.+-]+@[\w-]+\.[a-zA-Z]{2,}$');
-                if (!emailRegex.hasMatch(v.trim())) return 'Enter a valid email';
-                return null;
-              },
+              validator: AppValidators.email,
             ),
             const SizedBox(height: ParentUiSpacing.lg),
             AuthPrimaryButton(

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/routing/app_router.dart';
-import '../../../../core/routing/auth_routes.dart';
+import '../../../../core/utils/validators.dart';
 import '../../../../features/parent/presentation/widgets/parent_ui_constants.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/auth_primary_button.dart';
@@ -175,11 +175,7 @@ class _RegisterCard extends StatelessWidget {
               controller: nameController,
               hint: 'Full name',
               prefixIcon: Icons.person_outline_rounded,
-              validator: (v) {
-                if (v == null || v.trim().isEmpty) return 'Full name is required';
-                if (v.trim().length < 3) return 'Name must be at least 3 characters';
-                return null;
-              },
+              validator: AppValidators.fullName,
             ),
             const SizedBox(height: ParentUiSpacing.md),
             AuthTextField(
@@ -187,12 +183,7 @@ class _RegisterCard extends StatelessWidget {
               hint: 'Email address',
               prefixIcon: Icons.email_outlined,
               keyboardType: TextInputType.emailAddress,
-              validator: (v) {
-                if (v == null || v.trim().isEmpty) return 'Email is required';
-                final emailRegex = RegExp(r'^[\w.+-]+@[\w-]+\.[a-zA-Z]{2,}$');
-                if (!emailRegex.hasMatch(v.trim())) return 'Enter a valid email';
-                return null;
-              },
+              validator: AppValidators.email,
             ),
             const SizedBox(height: ParentUiSpacing.md),
             AuthTextField(
@@ -200,11 +191,7 @@ class _RegisterCard extends StatelessWidget {
               hint: 'Password',
               prefixIcon: Icons.lock_outline_rounded,
               obscure: true,
-              validator: (v) {
-                if (v == null || v.isEmpty) return 'Password is required';
-                if (v.length < 8) return 'Minimum 8 characters';
-                return null;
-              },
+              validator: AppValidators.password,
             ),
             const SizedBox(height: ParentUiSpacing.md),
             AuthTextField(
@@ -214,11 +201,10 @@ class _RegisterCard extends StatelessWidget {
               obscure: true,
               textInputAction: TextInputAction.done,
               onFieldSubmitted: (_) => onRegister(),
-              validator: (v) {
-                if (v == null || v.isEmpty) return 'Please confirm your password';
-                if (v != passwordController.text) return 'Passwords do not match';
-                return null;
-              },
+              validator: (v) => AppValidators.confirmPassword(
+                v,
+                passwordController.text,
+              ),
             ),
             const SizedBox(height: ParentUiSpacing.lg),
             AuthPrimaryButton(
