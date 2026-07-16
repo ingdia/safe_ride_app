@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../domain/models/student.dart';
+import '../bloc/driver_route_bloc.dart';
+import '../bloc/driver_route_event.dart';
+import '../bloc/driver_route_state.dart';
 
 /// Driver's "Student Attendance List" screen.
 ///
@@ -15,115 +19,93 @@ import '../../domain/models/student.dart';
 /// Task 2 (feature/driver-bloc) will move this to `DriverRouteBloc` so
 /// that marking a student triggers the parent notification described in
 /// the user flow.
-class StudentAttendanceScreen extends StatefulWidget {
+class StudentAttendanceScreen extends StatelessWidget {
   const StudentAttendanceScreen({super.key});
 
-  @override
-  State<StudentAttendanceScreen> createState() =>
-      _StudentAttendanceScreenState();
-}
+  void _cycleStatus(BuildContext context, Student student) {
+    final next = switch (student.status) {
+      AttendanceStatus.notBoarded => AttendanceStatus.boarded,
+      AttendanceStatus.boarded => AttendanceStatus.absent,
+      AttendanceStatus.absent => AttendanceStatus.notBoarded,
+    };
 
-class _StudentAttendanceScreenState extends State<StudentAttendanceScreen> {
-  // TODO(Task 2): Replace with data from DriverRouteBloc / DriverRepository.
-  final List<Student> _students = const [
-    Student(
-      id: 's1',
-      name: 'Emma Johnson',
-      stopName: 'Oak Street',
-      grade: 'Grade 3',
-    ),
-    Student(
-      id: 's2',
-      name: 'Liam Uwimana',
-      stopName: 'Oak Street',
-      grade: 'Grade 2',
-    ),
-    Student(
-      id: 's3',
-      name: 'Aline Mukamana',
-      stopName: 'Oak Street',
-      grade: 'Grade 4',
-    ),
-    Student(
-      id: 's4',
-      name: 'Noah Habimana',
-      stopName: 'Maple Avenue',
-      grade: 'Grade 1',
-    ),
-    Student(
-      id: 's5',
-      name: 'Grace Ineza',
-      stopName: 'Maple Avenue',
-      grade: 'Grade 3',
-    ),
-  ].map((s) => s).toList();
-
-  void _cycleStatus(String studentId) {
-    setState(() {
-      final index = _students.indexWhere((s) => s.id == studentId);
-      if (index == -1) return;
-
-      final current = _students[index].status;
-      final next = switch (current) {
-        AttendanceStatus.notBoarded => AttendanceStatus.boarded,
-        AttendanceStatus.boarded => AttendanceStatus.absent,
-        AttendanceStatus.absent => AttendanceStatus.notBoarded,
-      };
-
-      _students[index] = _students[index].copyWith(status: next);
-
-      // TODO(Task 2): Dispatch MarkStudentStatusEvent(studentId, next) to
-      // DriverRouteBloc, which will trigger the parent notification.
-    });
+    context.read<DriverRouteBloc>().add(
+          MarkStudentAttendance(
+            studentId: student.id,
+            status: next,
+          ),
+        );
   }
 
-  int _countFor(AttendanceStatus status) =>
-      _students.where((s) => s.status == status).length;
+  int _countFor(List<Student> students, AttendanceStatus status) =>
+      students.where((s) => s.status == status).length;
 
   @override
   Widget build(BuildContext context) {
-    // Group students by stop, preserving first-seen order.
-    final stopOrder = <String>[];
-    final byStop = <String, List<Student>>{};
-    for (final student in _students) {
-      if (!byStop.containsKey(student.stopName)) {
-        stopOrder.add(student.stopName);
-        byStop[student.stopName] = [];
-      }
-      byStop[student.stopName]!.add(student);
-    }
-
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
-        child: CustomScrollView(
-          slivers: [
-            SliverToBoxAdapter(child: _buildHeader(context)),
-            SliverToBoxAdapter(child: _buildSummaryRow(context)),
-            for (final stopName in stopOrder) ...[
-              SliverToBoxAdapter(child: _buildStopHeader(stopName)),
-              SliverPadding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.md,
-                ),
-                sliver: SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) {
-                      final student = byStop[stopName]![index];
-                      return _StudentListItem(
-                        student: student,
-                        onTap: () => _cycleStatus(student.id),
-                      );
-                    },
-                    childCount: byStop[stopName]!.length,
+        child: BlocBuilder<DriverRouteBloc, DriverRouteState>(
+          builder: (context, state) {
+            if (state is DriverRouteLoading || state is DriverRouteInitial) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            if (state is DriverRouteError) {
+              return Center(
+                child: Text(
+                  'Unable to load attendance: ${state.message}',
+                  textAlign: TextAlign.center,
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: AppColors.textSecondary,
                   ),
                 ),
-              ),
-            ],
-            const SliverToBoxAdapter(
-              child: SizedBox(height: AppSpacing.xl),
-            ),
-          ],
+              );
+            }
+
+            final students = (state as DriverRouteLoaded).students;
+
+            // Group students by stop, preserving first-seen order.
+            final stopOrder = <String>[];
+            final byStop = <String, List<Student>>{};
+            for (final student in students) {
+              if (!byStop.containsKey(student.stopName)) {
+                stopOrder.add(student.stopName);
+                byStop[student.stopName] = [];
+              }
+              byStop[student.stopName]!.add(student);
+            }
+
+            return CustomScrollView(
+              slivers: [
+                SliverToBoxAdapter(child: _buildHeader(context)),
+                SliverToBoxAdapter(child: _buildSummaryRow(context, students)),
+                for (final stopName in stopOrder) ...[
+                  SliverToBoxAdapter(child: _buildStopHeader(stopName)),
+                  SliverPadding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                    ),
+                    sliver: SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) {
+                          final student = byStop[stopName]![index];
+                          return _StudentListItem(
+                            student: student,
+                            onTap: () => _cycleStatus(context, student),
+                          );
+                        },
+                        childCount: byStop[stopName]!.length,
+                      ),
+                    ),
+                  ),
+                ],
+                const SliverToBoxAdapter(
+                  child: SizedBox(height: AppSpacing.xl),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -153,26 +135,26 @@ class _StudentAttendanceScreenState extends State<StudentAttendanceScreen> {
     );
   }
 
-  Widget _buildSummaryRow(BuildContext context) {
+  Widget _buildSummaryRow(BuildContext context, List<Student> students) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
       child: Row(
         children: [
           _SummaryPill(
             label: 'Boarded',
-            count: _countFor(AttendanceStatus.boarded),
+            count: _countFor(students, AttendanceStatus.boarded),
             color: AppColors.success,
           ),
           const SizedBox(width: AppSpacing.sm),
           _SummaryPill(
             label: 'Not Boarded',
-            count: _countFor(AttendanceStatus.notBoarded),
+            count: _countFor(students, AttendanceStatus.notBoarded),
             color: AppColors.warning,
           ),
           const SizedBox(width: AppSpacing.sm),
           _SummaryPill(
             label: 'Absent',
-            count: _countFor(AttendanceStatus.absent),
+            count: _countFor(students, AttendanceStatus.absent),
             color: AppColors.error,
           ),
         ],
