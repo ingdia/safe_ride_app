@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'features/parent/presentation/screens/parent_navigation_shell.dart';
+import 'features/auth/presentation/screens/login_screen.dart';
 import 'features/parent/presentation/widgets/parent_ui_constants.dart';
 
 void main() {
@@ -34,7 +34,7 @@ class SafeRideApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const ParentNavigationShell(),
+      home: const LoginScreen(),
     );
   }
 }
