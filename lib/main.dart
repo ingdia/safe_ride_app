@@ -61,6 +61,7 @@ class _SplashScreenState extends State<SplashScreen>
   late final AnimationController _controller;
   late final Animation<double> _fade;
   late final Animation<double> _scale;
+  bool _disposed = false;
 
   @override
   void initState() {
@@ -76,14 +77,17 @@ class _SplashScreenState extends State<SplashScreen>
 
     _controller.forward();
 
-    Future.delayed(const Duration(milliseconds: 2400), () {
-      if (!mounted) return;
-      Navigator.pushReplacementNamed(context, '/auth/login');
-    });
+    Future.delayed(const Duration(milliseconds: 2400), _navigate);
+  }
+
+  void _navigate() {
+    if (_disposed || !mounted) return;
+    Navigator.pushReplacementNamed(context, '/auth/login');
   }
 
   @override
   void dispose() {
+    _disposed = true;
     _controller.dispose();
     super.dispose();
   }
