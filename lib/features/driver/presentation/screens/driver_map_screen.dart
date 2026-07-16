@@ -1,4 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+
+import '../bloc/driver_route_bloc.dart';
+import '../bloc/driver_route_state.dart';
+import '../../domain/models/route_stop.dart';
 
 /// -----------------------------------------------------------------------
 /// DriverMapScreen
@@ -19,22 +24,6 @@ import 'package:flutter/material.dart';
 /// fully interactive.
 /// -----------------------------------------------------------------------
 
-enum StopStatus { completed, current, upcoming }
-
-class RouteStop {
-  final int order;
-  final String name;
-  final int studentCount;
-  final StopStatus status;
-
-  const RouteStop({
-    required this.order,
-    required this.name,
-    required this.studentCount,
-    required this.status,
-  });
-}
-
 class DriverMapScreen extends StatefulWidget {
   const DriverMapScreen({super.key});
 
@@ -43,16 +32,6 @@ class DriverMapScreen extends StatefulWidget {
 }
 
 class _DriverMapScreenState extends State<DriverMapScreen> {
-  // TODO(Task 2 - BLoC): Replace this mock list with data from DriverBloc /
-  // the mock data-layer repository for route stops.
-  final List<RouteStop> _stops = const [
-    RouteStop(order: 1, name: 'Oak Street', studentCount: 3, status: StopStatus.completed),
-    RouteStop(order: 2, name: 'Maple Avenue', studentCount: 2, status: StopStatus.current),
-    RouteStop(order: 3, name: 'Pine Road', studentCount: 4, status: StopStatus.upcoming),
-    RouteStop(order: 4, name: 'Cedar Lane', studentCount: 1, status: StopStatus.upcoming),
-    RouteStop(order: 5, name: 'Birch Court', studentCount: 2, status: StopStatus.upcoming),
-  ];
-
   // Brand palette (amber / white / gray) per Design Decisions section.
   static const Color _amber = Color(0xFFF5A623);
   static const Color _amberDark = Color(0xFFE8890C);
@@ -68,21 +47,41 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
           children: [
             _buildHeader(),
             Expanded(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  // Landscape-safe: switch stop list to a scrollable column
-                  // regardless of orientation so nothing overflows.
-                  return ListView(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    children: [
-                      const SizedBox(height: 16),
-                      _buildMapPlaceholder(),
-                      const SizedBox(height: 24),
-                      _buildStopsHeader(),
-                      const SizedBox(height: 12),
-                      ..._stops.map(_buildStopTile),
-                      const SizedBox(height: 24),
-                    ],
+              child: BlocBuilder<DriverRouteBloc, DriverRouteState>(
+                builder: (context, state) {
+                  if (state is DriverRouteLoading || state is DriverRouteInitial) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  if (state is DriverRouteError) {
+                    return Center(
+                      child: Text(
+                        'Unable to load route: ${state.message}',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.grey[700]),
+                      ),
+                    );
+                  }
+
+                  final stops = (state as DriverRouteLoaded).stops;
+
+                  return LayoutBuilder(
+                    builder: (context, constraints) {
+                      // Landscape-safe: switch stop list to a scrollable column
+                      // regardless of orientation so nothing overflows.
+                      return ListView(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        children: [
+                          const SizedBox(height: 16),
+                          _buildMapPlaceholder(),
+                          const SizedBox(height: 24),
+                          _buildStopsHeader(stops),
+                          const SizedBox(height: 12),
+                          ...stops.map(_buildStopTile),
+                          const SizedBox(height: 24),
+                        ],
+                      );
+                    },
                   );
                 },
               ),
@@ -180,7 +179,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
     );
   }
 
-  Widget _buildStopsHeader() {
+  Widget _buildStopsHeader(List<RouteStop> stops) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -193,7 +192,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
           ),
         ),
         Text(
-          '${_stops.length} stops',
+          '${stops.length} stops',
           style: TextStyle(fontSize: 14, color: Colors.grey[600]),
         ),
       ],
@@ -267,9 +266,9 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
     );
   }
 
-  _StatusInfo _statusInfo(StopStatus status) {
+  _StatusInfo _statusInfo(RouteStopStatus status) {
     switch (status) {
-      case StopStatus.completed:
+      case RouteStopStatus.completed:
         return _StatusInfo(
           label: 'Completed',
           borderColor: const Color(0xFFBFE6C6),
@@ -278,7 +277,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
           chipBg: const Color(0xFFE3F6E5),
           chipText: const Color(0xFF2E7D32),
         );
-      case StopStatus.current:
+      case RouteStopStatus.current:
         return _StatusInfo(
           label: 'Current',
           borderColor: _amber,
@@ -287,7 +286,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
           chipBg: const Color(0xFFFCE8CF),
           chipText: _amberDark,
         );
-      case StopStatus.upcoming:
+      case RouteStopStatus.upcoming:
         return _StatusInfo(
           label: 'Upcoming',
           borderColor: const Color(0xFFE0E0E0),
