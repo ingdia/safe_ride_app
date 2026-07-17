@@ -6,12 +6,18 @@ import 'package:safe_ride_app/features/driver/presentation/bloc/driver_route_blo
 import 'package:safe_ride_app/features/driver/presentation/bloc/driver_route_event.dart';
 import 'package:safe_ride_app/features/driver/presentation/bloc/driver_route_state.dart';
 
+import '../../helpers/fake_attendance_cache_service.dart';
+
 void main() {
   group('DriverRouteBloc', () {
     late DriverRouteBloc bloc;
 
     setUp(() {
-      bloc = DriverRouteBloc(repository: MockDriverRepository());
+      bloc = DriverRouteBloc(
+        repository: MockDriverRepository(),
+        cacheService: FakeAttendanceCacheService(),
+        isOnline: true,
+      );
     });
 
     tearDown(() async {
