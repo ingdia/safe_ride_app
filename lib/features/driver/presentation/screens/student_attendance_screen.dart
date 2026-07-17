@@ -210,9 +210,9 @@ class _SummaryPill extends StatelessWidget {
           horizontal: AppSpacing.xs,
         ),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.10),
+          color: color.withValues(alpha: 0.10),
           borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-          border: Border.all(color: color.withOpacity(0.35)),
+          border: Border.all(color: color.withValues(alpha: 0.35)),
         ),
         child: Column(
           children: [
@@ -278,7 +278,7 @@ class _StudentListItem extends StatelessWidget {
                 children: [
                   CircleAvatar(
                     radius: 20,
-                    backgroundColor: AppColors.primary.withOpacity(0.12),
+                    backgroundColor: AppColors.primary.withValues(alpha: 0.12),
                     child: Text(
                       student.name.isNotEmpty
                           ? student.name.substring(0, 1)
@@ -352,7 +352,7 @@ class _AttendanceStatusChip extends StatelessWidget {
         vertical: AppSpacing.xs,
       ),
       decoration: BoxDecoration(
-        color: visuals.color.withOpacity(0.12),
+        color: visuals.color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
       ),
       child: Row(

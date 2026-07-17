@@ -49,12 +49,21 @@ class TodaysRouteScreen extends StatelessWidget {
               );
             }
 
-            final stops = (state as DriverRouteLoaded).stops;
+            final loadedState = state as DriverRouteLoaded;
+            final stops = loadedState.stops;
+            final progress = (loadedState.routeProgress * 100).round();
 
             return CustomScrollView(
               slivers: [
                 SliverToBoxAdapter(child: _buildHeader(context)),
-                SliverToBoxAdapter(child: _buildRouteSummaryCard(context, stops)),
+                SliverToBoxAdapter(
+                  child: _buildRouteSummaryCard(
+                    context,
+                    stops,
+                    progress: progress,
+                    gpsStatus: loadedState.gpsStatus,
+                  ),
+                ),
                 SliverToBoxAdapter(child: _buildStopsHeader(context, stops)),
                 SliverPadding(
                   padding: const EdgeInsets.symmetric(
@@ -119,7 +128,7 @@ class TodaysRouteScreen extends StatelessWidget {
               onTap: () => _showProfileMenu(context),
               child: CircleAvatar(
                 radius: 22,
-                backgroundColor: AppColors.primary.withOpacity(0.15),
+                backgroundColor: AppColors.primary.withValues(alpha: 0.15),
                 child: const Icon(Icons.person, color: AppColors.primary),
               ),
             ),
@@ -129,7 +138,12 @@ class TodaysRouteScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildRouteSummaryCard(BuildContext context, List<RouteStop> stops) {
+  Widget _buildRouteSummaryCard(
+    BuildContext context,
+    List<RouteStop> stops, {
+    required int progress,
+    required String gpsStatus,
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
       child: Container(
@@ -166,7 +180,7 @@ class TodaysRouteScreen extends StatelessWidget {
                     Text(
                       _routeName,
                       style: AppTextStyles.bodySmall.copyWith(
-                        color: Colors.white.withOpacity(0.9),
+                        color: Colors.white.withValues(alpha: 0.9),
                       ),
                     ),
                   ],
@@ -194,6 +208,33 @@ class TodaysRouteScreen extends StatelessWidget {
                   value: stops.first.time,
                 ),
               ],
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Container(
+              padding: const EdgeInsets.all(AppSpacing.sm),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.16),
+                borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Route status',
+                    style: AppTextStyles.bodySmall.copyWith(
+                      color: Colors.white.withValues(alpha: 0.9),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    '$progress% complete • $gpsStatus',
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -378,7 +419,7 @@ class _SummaryStat extends StatelessWidget {
           Text(
             label,
             style: AppTextStyles.bodySmall.copyWith(
-              color: Colors.white.withOpacity(0.85),
+              color: Colors.white.withValues(alpha: 0.85),
             ),
           ),
         ],
@@ -425,8 +466,8 @@ class _RouteStopTile extends StatelessWidget {
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
                     color: stop.isDestination
-                        ? AppColors.success.withOpacity(0.15)
-                        : AppColors.primary.withOpacity(0.12),
+                        ? AppColors.success.withValues(alpha: 0.15)
+                        : AppColors.primary.withValues(alpha: 0.12),
                     shape: BoxShape.circle,
                   ),
                   child: Text(
