@@ -63,7 +63,8 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
                     );
                   }
 
-                  final stops = (state as DriverRouteLoaded).stops;
+                  final loadedState = state as DriverRouteLoaded;
+                  final stops = loadedState.stops;
 
                   return LayoutBuilder(
                     builder: (context, constraints) {
@@ -73,7 +74,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         children: [
                           const SizedBox(height: 16),
-                          _buildMapPlaceholder(),
+                          _buildMapPlaceholder(loadedState),
                           const SizedBox(height: 24),
                           _buildStopsHeader(stops),
                           const SizedBox(height: 12),
@@ -124,7 +125,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
     );
   }
 
-  Widget _buildMapPlaceholder() {
+  Widget _buildMapPlaceholder(DriverRouteLoaded loadedState) {
     // TODO: Swap for a real map widget (google_maps_flutter / flutter_map)
     // once live GPS coordinates are available from the BLoC layer.
     return Container(
@@ -142,7 +143,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.06),
+                color: Colors.black.withValues(alpha: 0.06),
                 blurRadius: 8,
                 offset: const Offset(0, 3),
               ),
@@ -168,7 +169,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
               ),
               const SizedBox(height: 4),
               Text(
-                'GPS tracking visualization',
+                '${loadedState.routeProgress * 100 ~/ 1}% complete • ${loadedState.gpsStatus}',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 12, color: Colors.grey[600]),
               ),

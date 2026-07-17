@@ -17,10 +17,14 @@ class DriverRouteLoaded extends DriverRouteState {
   const DriverRouteLoaded({
     required this.stops,
     required this.students,
+    this.routeProgress = 0.0,
+    this.gpsStatus = 'Waiting for route start',
   });
 
   final List<RouteStop> stops;
   final List<Student> students;
+  final double routeProgress;
+  final String gpsStatus;
 }
 
 class DriverRouteError extends DriverRouteState {

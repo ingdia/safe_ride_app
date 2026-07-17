@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../domain/models/student.dart';
 import '../../domain/repositories/driver_repository.dart';
 import 'driver_route_event.dart';
 import 'driver_route_state.dart';
@@ -47,9 +48,19 @@ class DriverRouteBloc extends Bloc<DriverRouteEvent, DriverRouteState> {
               : student)
           .toList();
 
+      final boardedCount = updatedStudents
+          .where((student) => student.status == AttendanceStatus.boarded)
+          .length;
+      final totalStudents = updatedStudents.length;
+      final progress = totalStudents == 0 ? 0.0 : boardedCount / totalStudents;
+
       emit(DriverRouteLoaded(
         stops: currentState.stops,
         students: updatedStudents,
+        routeProgress: progress,
+        gpsStatus: progress >= 1.0
+            ? 'All students marked'
+            : 'Route progress ${((progress * 100).round())}%',
       ));
     } catch (error) {
       emit(DriverRouteError(message: error.toString()));
