@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/widgets/network_banner.dart';
 import '../../data/repositories/mock_driver_repository.dart';
 import '../bloc/driver_route_bloc.dart';
 import '../bloc/driver_route_event.dart';
@@ -8,11 +10,11 @@ import 'driver_map_screen.dart';
 import 'student_attendance_screen.dart';
 import 'todays_route_screen.dart';
 
-class DriverFeatureShell extends StatelessWidget {
+class DriverFeatureShell extends ConsumerWidget {
   const DriverFeatureShell({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return BlocProvider(
       create: (_) => DriverRouteBloc(
         repository: MockDriverRepository(),
@@ -28,14 +30,16 @@ class _DriverFeatureScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: const SafeArea(
-        child: IndexedStack(
-          index: 0,
-          children: [
-            TodaysRouteScreen(),
-            StudentAttendanceScreen(),
-            DriverMapScreen(),
-          ],
+      body: NetworkBanner(
+        child: SafeArea(
+          child: IndexedStack(
+            index: 0,
+            children: const [
+              TodaysRouteScreen(),
+              StudentAttendanceScreen(),
+              DriverMapScreen(),
+            ],
+          ),
         ),
       ),
     );
