@@ -12,6 +12,9 @@ class ConnectivityService {
     return _isOnline(results);
   }
 
-  bool _isOnline(List<ConnectivityResult> results) =>
+  bool _isOnline(List<ConnectivityResult> results) => isOnlineFromResults(results);
+
+  /// Exposed for testing — maps a result list to a boolean online status.
+  bool isOnlineFromResults(List<ConnectivityResult> results) =>
       results.any((r) => r != ConnectivityResult.none);
 }
