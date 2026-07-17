@@ -6,9 +6,15 @@ import 'package:safe_ride_app/features/driver/presentation/bloc/driver_route_blo
 import 'package:safe_ride_app/features/driver/presentation/bloc/driver_route_event.dart';
 import 'package:safe_ride_app/features/driver/presentation/bloc/driver_route_state.dart';
 
+import 'helpers/fake_attendance_cache_service.dart';
+
 void main() {
   test('attendance updates emit progress metadata', () async {
-    final bloc = DriverRouteBloc(repository: MockDriverRepository());
+    final bloc = DriverRouteBloc(
+      repository: MockDriverRepository(),
+      cacheService: FakeAttendanceCacheService(),
+      isOnline: true,
+    );
     addTearDown(bloc.close);
 
     bloc.add(const LoadDriverRoute());
