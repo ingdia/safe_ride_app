@@ -3,6 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/users_provider.dart';
 import '../widgets/admin_ui_constants.dart';
 import '../widgets/gradient_header.dart';
+import 'app_settings_screen.dart';
+import 'help_support_screen.dart';
+import 'notification_preferences_screen.dart';
+
+void _showComingSoon(BuildContext context, String feature) {
+  ScaffoldMessenger.of(
+    context,
+  ).showSnackBar(SnackBar(content: Text('$feature is coming soon')));
+}
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -23,28 +32,31 @@ class ProfileScreen extends ConsumerWidget {
                   AdminUiSpacing.md,
                   AdminUiSpacing.lg,
                   AdminUiSpacing.md,
-                  AdminUiSpacing.xl + AdminUiSpacing.lg,
+                  AdminUiSpacing.xl,
                 ),
-                child: const HeaderTitleBlock(
-                  title: 'Profile',
-                  subtitle: 'Manage your account',
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    const HeaderTitleBlock(
+                      title: 'Profile',
+                      subtitle: 'Manage your account',
+                    ),
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      top: 70,
+                      child: _ProfileCard(
+                        name: admin.name,
+                        role: 'Fleet Administrator',
+                        email: admin.email,
+                        phone: admin.phone,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: AdminUiSpacing.md),
-              sliver: SliverToBoxAdapter(
-                child: Transform.translate(
-                  offset: const Offset(0, -AdminUiSpacing.xl),
-                  child: _ProfileCard(
-                    name: admin.name,
-                    role: 'Fleet Administrator',
-                    email: admin.email,
-                    phone: admin.phone,
-                  ),
-                ),
-              ),
-            ),
+            const SliverToBoxAdapter(child: SizedBox(height: 200)),
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(
                 AdminUiSpacing.md,
@@ -53,79 +65,100 @@ class ProfileScreen extends ConsumerWidget {
                 0,
               ),
               sliver: SliverToBoxAdapter(
-                child: Transform.translate(
-                  offset: const Offset(0, -AdminUiSpacing.lg),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Settings',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                        ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Settings',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
                       ),
-                      const SizedBox(height: AdminUiSpacing.sm),
-                      const _SettingsTile(
-                        icon: Icons.notifications_none_rounded,
-                        title: 'Notifications',
-                        subtitle: 'Manage alert preferences',
-                      ),
-                      const SizedBox(height: AdminUiSpacing.sm),
-                      const _SettingsTile(
-                        icon: Icons.shield_outlined,
-                        title: 'Privacy & Security',
-                        subtitle: 'Update your security settings',
-                      ),
-                      const SizedBox(height: AdminUiSpacing.sm),
-                      const _SettingsTile(
-                        icon: Icons.tune_rounded,
-                        title: 'App Settings',
-                        subtitle: 'Customize your experience',
-                      ),
-                      const SizedBox(height: AdminUiSpacing.sm),
-                      const _SettingsTile(
-                        icon: Icons.help_outline_rounded,
-                        title: 'Help & Support',
-                        subtitle: 'Get help and contact us',
-                      ),
-                      const SizedBox(height: AdminUiSpacing.lg),
-                      SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton.icon(
-                          onPressed: () {},
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: AdminUiColors.delayedFg,
-                            side: const BorderSide(color: AdminUiColors.delayedFg),
+                    ),
+                    const SizedBox(height: AdminUiSpacing.sm),
+                    _SettingsTile(
+                      icon: Icons.notifications_none_rounded,
+                      title: 'Notifications',
+                      subtitle: 'Manage alert preferences',
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                const NotificationPreferencesScreen(),
                           ),
-                          icon: const Icon(Icons.logout_rounded, size: 18),
-                          label: const Text('Logout & Switch Role'),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: AdminUiSpacing.sm),
+                    _SettingsTile(
+                      icon: Icons.shield_outlined,
+                      title: 'Privacy & Security',
+                      subtitle: 'Update your security settings',
+                      onTap: () =>
+                          _showComingSoon(context, 'Privacy & Security'),
+                    ),
+                    const SizedBox(height: AdminUiSpacing.sm),
+                    _SettingsTile(
+                      icon: Icons.tune_rounded,
+                      title: 'App Settings',
+                      subtitle: 'Customize your experience',
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const AppSettingsScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: AdminUiSpacing.sm),
+                    _SettingsTile(
+                      icon: Icons.help_outline_rounded,
+                      title: 'Help & Support',
+                      subtitle: 'Get help and contact us',
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const HelpSupportScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: AdminUiSpacing.lg),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () => _showComingSoon(context, 'Logout'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AdminUiColors.dangerFg,
+                          side: const BorderSide(color: AdminUiColors.dangerFg),
                         ),
+                        icon: const Icon(Icons.logout_rounded, size: 18),
+                        label: const Text('Logout & Switch Role'),
                       ),
-                      const SizedBox(height: AdminUiSpacing.lg),
-                      const Center(
-                        child: Column(
-                          children: [
-                            Text(
-                              'SafeRide v1.0.0',
-                              style: TextStyle(
-                                color: AdminUiColors.textSecondary,
-                                fontSize: 12,
-                              ),
+                    ),
+                    const SizedBox(height: AdminUiSpacing.lg),
+                    const Center(
+                      child: Column(
+                        children: [
+                          Text(
+                            'SafeRide v1.0.0',
+                            style: TextStyle(
+                              color: AdminUiColors.textSecondary,
+                              fontSize: 12,
                             ),
-                            Text(
-                              '© 2026 SafeRide Transportation',
-                              style: TextStyle(
-                                color: AdminUiColors.textSecondary,
-                                fontSize: 11,
-                              ),
+                          ),
+                          Text(
+                            '© 2026 SafeRide Transportation',
+                            style: TextStyle(
+                              color: AdminUiColors.textSecondary,
+                              fontSize: 11,
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: AdminUiSpacing.lg),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(height: AdminUiSpacing.lg),
+                  ],
                 ),
               ),
             ),
@@ -169,13 +202,40 @@ class _ProfileCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const CircleAvatar(
-                radius: 28,
-                backgroundColor: AdminUiColors.statCardBackground,
-                child: Icon(
-                  Icons.person_rounded,
-                  color: AdminUiColors.primaryOrange,
-                  size: 28,
+              Container(
+                width: 60,
+                height: 60,
+                padding: const EdgeInsets.all(2),
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.fromBorderSide(
+                    BorderSide(color: AdminUiColors.primaryOrange, width: 2),
+                  ),
+                ),
+                child: ClipOval(
+                  child: Image.network(
+                    'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&h=200&fit=crop',
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      color: AdminUiColors.statCardBackground,
+                      child: const Icon(
+                        Icons.person_rounded,
+                        color: AdminUiColors.primaryOrange,
+                        size: 28,
+                      ),
+                    ),
+                    loadingBuilder: (context, child, progress) {
+                      if (progress == null) return child;
+                      return Container(
+                        color: AdminUiColors.statCardBackground,
+                        child: const Icon(
+                          Icons.person_rounded,
+                          color: AdminUiColors.primaryOrange,
+                          size: 28,
+                        ),
+                      );
+                    },
+                  ),
                 ),
               ),
               const SizedBox(width: AdminUiSpacing.md),
@@ -264,7 +324,7 @@ class _LabeledValue extends StatelessWidget {
         Text(
           label,
           style: const TextStyle(
-            color: AdminUiColors.primaryOrange,
+            color: AdminUiColors.textSecondary,
             fontSize: 11.5,
           ),
         ),
@@ -282,17 +342,19 @@ class _SettingsTile extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
+  final VoidCallback onTap;
 
   const _SettingsTile({
     required this.icon,
     required this.title,
     required this.subtitle,
+    required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: () {},
+      onTap: onTap,
       borderRadius: BorderRadius.circular(AdminUiRadii.card),
       hoverColor: AdminUiColors.primaryOrange.withValues(alpha: 0.04),
       mouseCursor: SystemMouseCursors.click,
