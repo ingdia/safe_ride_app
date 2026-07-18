@@ -338,6 +338,7 @@ class _ReportCard extends StatelessWidget {
               Expanded(
                 child: ElevatedButton.icon(
                   onPressed: () {},
+                  style: ElevatedButton.styleFrom(shape: const StadiumBorder()),
                   icon: const Icon(Icons.download_rounded, size: 16),
                   label: const Text('Download PDF'),
                 ),
@@ -346,9 +347,9 @@ class _ReportCard extends StatelessWidget {
               Container(
                 width: 40,
                 height: 40,
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   color: AdminUiColors.statCardBackground,
-                  borderRadius: BorderRadius.circular(AdminUiRadii.button),
+                  shape: BoxShape.circle,
                 ),
                 child: const Icon(
                   Icons.ios_share_rounded,
