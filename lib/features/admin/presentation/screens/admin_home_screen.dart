@@ -161,7 +161,9 @@ class FleetOverviewScreen extends ConsumerWidget {
               ),
             ),
             SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: AdminUiSpacing.md),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AdminUiSpacing.md,
+              ),
               sliver: SliverList.separated(
                 itemCount: notifications.length,
                 separatorBuilder: (_, __) =>
@@ -199,14 +201,16 @@ class FleetOverviewScreen extends ConsumerWidget {
                           );
                         },
                         icon: const Icon(Icons.bar_chart_rounded, size: 18),
-                        label: const Text('View Reports'),
+                        label: const Text('Reports'),
                       ),
                     ),
                   ],
                 ),
               ),
             ),
-            const SliverToBoxAdapter(child: SizedBox(height: AdminUiSpacing.lg)),
+            const SliverToBoxAdapter(
+              child: SizedBox(height: AdminUiSpacing.lg),
+            ),
           ],
         ),
       ),
