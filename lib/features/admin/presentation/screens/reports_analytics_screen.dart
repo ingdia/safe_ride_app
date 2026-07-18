@@ -122,7 +122,7 @@ class ReportsAnalyticsScreen extends StatelessWidget {
               ),
               sliver: SliverList.separated(
                 itemCount: _reports.length,
-                separatorBuilder: (_, __) =>
+                separatorBuilder: (_, _) =>
                     const SizedBox(height: AdminUiSpacing.sm),
                 itemBuilder: (context, index) =>
                     _ReportCard(report: _reports[index]),
