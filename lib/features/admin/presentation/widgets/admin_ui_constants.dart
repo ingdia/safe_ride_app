@@ -3,27 +3,36 @@ import 'package:flutter/material.dart';
 class AdminUiColors {
   AdminUiColors._();
 
-  static const Color primaryOrange = Color(0xFFF97316);
-  static const Color primaryOrangeDark = Color(0xFFC2410C);
-  static const Color primaryOrangeLight = Color(0xFFFFA94D);
+  // Brand color swapped from custom orange to Tailwind v4's amber scale.
+  // Names kept as "primaryOrange*" so no other file needs to change --
+  // only the values here were updated.
+  static const Color primaryOrange = Color(0xFFF59E0B); // amber-500
+  static const Color primaryOrangeDark = Color(0xFFB45309); // amber-700
+  static const Color primaryOrangeLight = Color(0xFFFCD34D); // amber-300
 
-  static const Color scaffoldBackground = Color(0xFFF7F7F9);
-  static const Color cardBackground = Color(0xFFFFFFFF);
-  static const Color statCardBackground = Color(0xFFFFF3E6);
+  static const Color scaffoldBackground = Color(0xFFF9FAFB); // gray-50
+  static const Color cardBackground = Color(0xFFFFFFFF); // white
+  static const Color statCardBackground = Color(0xFFFFFBEB); // amber-50
 
-  static const Color onTimeBg = Color(0xFFE7F7EE);
-  static const Color onTimeFg = Color(0xFF1E9E5A);
-  static const Color delayedBg = Color(0xFFFFF3E0);
-  static const Color delayedFg = Color(0xFFE08A00);
-  static const Color infoBg = Color(0xFFE8F1FF);
-  static const Color infoFg = Color(0xFF2F6FED);
+  static const Color onTimeBg = Color(0xFFDCFCE7); // green-100
+  static const Color onTimeFg = Color(0xFF16A34A); // green-600
+  static const Color delayedBg = Color(0xFFFEF3C7); // amber-100
+  static const Color delayedFg = Color(0xFFD97706); // amber-600
+  static const Color infoBg = Color(0xFFDBEAFE); // blue-100
+  static const Color infoFg = Color(0xFF2563EB); // blue-600
 
-  static const Color textPrimary = Color(0xFF1F2430);
-  static const Color textSecondary = Color(0xFF7C8393);
+  // True red, distinct from the amber delayedFg (which is legitimately used
+  // for the "Delayed" bus status badge). This is for genuinely
+  // destructive/danger actions like Logout.
+  static const Color dangerBg = Color(0xFFFEE2E2); // red-100
+  static const Color dangerFg = Color(0xFFDC2626); // red-600
+
+  static const Color textPrimary = Color(0xFF1F2937); // gray-800
+  static const Color textSecondary = Color(0xFF6B7280); // gray-500
   static const Color textOnDark = Color(0xFFFFFFFF);
 
-  static const Color borderSubtle = Color(0xFFF1D9B8);
-  static const Color divider = Color(0xFFECECEF);
+  static const Color borderSubtle = Color(0xFFFEF3C7); // amber-100
+  static const Color divider = Color(0xFFE5E7EB); // gray-200
 }
 
 class AdminUiRadii {
@@ -107,9 +116,7 @@ class AdminTheme {
             if (states.contains(WidgetState.hovered)) return 4;
             return 0;
           }),
-          mouseCursor: const WidgetStatePropertyAll(
-            SystemMouseCursors.click,
-          ),
+          mouseCursor: const WidgetStatePropertyAll(SystemMouseCursors.click),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
@@ -138,9 +145,7 @@ class AdminTheme {
             }
             return null;
           }),
-          mouseCursor: const WidgetStatePropertyAll(
-            SystemMouseCursors.click,
-          ),
+          mouseCursor: const WidgetStatePropertyAll(SystemMouseCursors.click),
         ),
       ),
     );
