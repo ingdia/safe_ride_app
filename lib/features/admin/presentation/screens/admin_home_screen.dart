@@ -42,9 +42,6 @@ class FleetOverviewScreen extends ConsumerWidget {
       }
     }
     if (existing == null) {
-      // Bus was removed (e.g. deleted from another session/tab) between
-      // the card rendering and this tap registering. Bail out quietly
-      // instead of crashing with "Bad state: No element".
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('This bus no longer exists')),
@@ -158,7 +155,7 @@ class FleetOverviewScreen extends ConsumerWidget {
               ),
               sliver: SliverList.separated(
                 itemCount: summaries.length,
-                separatorBuilder: (_, __) =>
+                separatorBuilder: (_, _) =>
                     const SizedBox(height: AdminUiSpacing.sm),
                 itemBuilder: (context, index) => Center(
                   child: ConstrainedBox(
@@ -194,7 +191,7 @@ class FleetOverviewScreen extends ConsumerWidget {
               ),
               sliver: SliverList.separated(
                 itemCount: notifications.length,
-                separatorBuilder: (_, __) =>
+                separatorBuilder: (_, _) =>
                     const SizedBox(height: AdminUiSpacing.sm),
                 itemBuilder: (context, index) =>
                     AlertPreviewTile(notification: notifications[index]),

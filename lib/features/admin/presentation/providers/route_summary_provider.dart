@@ -52,9 +52,6 @@ final routeSummaryProvider = Provider<List<RouteSummary>>((ref) {
   final buses = ref.watch(busesProvider);
 
   return routes.map((route) {
-    // A route's assigned bus can be deleted from Fleet Overview without the
-    // route itself being cleaned up, so the lookup must tolerate a missing
-    // bus instead of crashing (previously used firstWhere with no orElse).
     final primaryBus = _findBus(buses, route.busId);
     final backupBusId = _backupBusIdByRouteId[route.routeId];
 

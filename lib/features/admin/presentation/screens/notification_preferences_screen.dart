@@ -2,10 +2,6 @@ import 'package:flutter/material.dart';
 import '../widgets/admin_ui_constants.dart';
 import '../widgets/gradient_header.dart';
 
-/// Notification *preferences* (which alert types the admin wants to
-/// receive) - distinct from AdminNotificationsScreen, which shows the
-/// live feed of alerts that already happened. Reached from Profile ->
-/// Settings -> Notifications.
 class NotificationPreferencesScreen extends StatefulWidget {
   const NotificationPreferencesScreen({super.key});
 

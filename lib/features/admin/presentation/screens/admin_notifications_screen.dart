@@ -25,11 +25,6 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
         ? notifications.where((n) => !n.isRead).toList()
         : notifications;
 
-    // NotificationsScreen doubles as the Alerts bottom-nav tab (where it's
-    // the root of the IndexedStack and shouldn't show a back button) and as
-    // a screen pushed from elsewhere, e.g. Profile's Notifications settings
-    // tile (where it needs one). Navigator.canPop tells us which case we're
-    // in without needing a separate parameter.
     final canPop = Navigator.canPop(context);
 
     return Scaffold(
@@ -124,7 +119,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
               ),
               sliver: SliverList.separated(
                 itemCount: filtered.length,
-                separatorBuilder: (_, __) =>
+                separatorBuilder: (_, _) =>
                     const SizedBox(height: AdminUiSpacing.sm),
                 itemBuilder: (context, index) => _NotificationCard(
                   notification: filtered[index],
