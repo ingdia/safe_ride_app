@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../data/models/bus_model.dart';
 import 'buses_provider.dart';
 import 'routes_provider.dart';
 
@@ -39,17 +40,28 @@ final Map<String, int> _mockRouteStudentCounts = {
   'route-d': 16,
 };
 
+BusModel? _findBus(List<BusModel> buses, String busId) {
+  for (final bus in buses) {
+    if (bus.busId == busId) return bus;
+  }
+  return null;
+}
+
 final routeSummaryProvider = Provider<List<RouteSummary>>((ref) {
   final routes = ref.watch(routesProvider);
   final buses = ref.watch(busesProvider);
 
   return routes.map((route) {
-    final primaryBus = buses.firstWhere((b) => b.busId == route.busId);
+    // A route's assigned bus can be deleted from Fleet Overview without the
+    // route itself being cleaned up, so the lookup must tolerate a missing
+    // bus instead of crashing (previously used firstWhere with no orElse).
+    final primaryBus = _findBus(buses, route.busId);
     final backupBusId = _backupBusIdByRouteId[route.routeId];
-    final plateNumbers = [primaryBus.plateNumber];
+
+    final plateNumbers = <String>[primaryBus?.plateNumber ?? 'Unassigned'];
     if (backupBusId != null) {
-      final backupBus = buses.firstWhere((b) => b.busId == backupBusId);
-      plateNumbers.add(backupBus.plateNumber);
+      final backupBus = _findBus(buses, backupBusId);
+      plateNumbers.add(backupBus?.plateNumber ?? 'Unassigned');
     }
 
     return RouteSummary(
