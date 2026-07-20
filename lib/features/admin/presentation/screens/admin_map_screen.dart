@@ -164,7 +164,7 @@ class LiveMapScreen extends StatelessWidget {
               padding: const EdgeInsets.all(AdminUiSpacing.md),
               sliver: SliverList.separated(
                 itemCount: _liveStops.length,
-                separatorBuilder: (_, __) =>
+                separatorBuilder: (_, _) =>
                     const SizedBox(height: AdminUiSpacing.sm),
                 itemBuilder: (context, index) =>
                     _StopRow(stop: _liveStops[index]),
@@ -192,7 +192,9 @@ class _StopRow extends StatelessWidget {
         color: AdminUiColors.cardBackground,
         borderRadius: BorderRadius.circular(AdminUiRadii.card),
         border: Border.all(
-          color: isCurrent ? AdminUiColors.primaryOrange : AdminUiColors.borderSubtle,
+          color: isCurrent
+              ? AdminUiColors.primaryOrange
+              : AdminUiColors.borderSubtle,
           width: isCurrent ? 1.5 : 1,
         ),
       ),

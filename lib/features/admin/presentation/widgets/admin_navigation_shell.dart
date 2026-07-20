@@ -91,11 +91,18 @@ class _NavBarItem extends StatelessWidget {
       onTap: onTap,
       hoverColor: AdminUiColors.primaryOrange.withValues(alpha: 0.06),
       mouseCursor: SystemMouseCursors.click,
-      borderRadius: BorderRadius.circular(10),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
+      borderRadius: BorderRadius.circular(AdminUiRadii.chip),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: EdgeInsets.symmetric(
           vertical: AdminUiSpacing.sm,
-          horizontal: AdminUiSpacing.sm,
+          horizontal: selected ? AdminUiSpacing.md : AdminUiSpacing.sm,
+        ),
+        decoration: BoxDecoration(
+          color: selected
+              ? AdminUiColors.statCardBackground
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(AdminUiRadii.chip),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,

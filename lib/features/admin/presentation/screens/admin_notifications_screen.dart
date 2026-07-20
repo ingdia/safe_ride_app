@@ -21,8 +21,11 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   Widget build(BuildContext context) {
     final notifications = ref.watch(notificationsProvider);
     final unreadCount = ref.watch(unreadNotificationsCountProvider);
-    final filtered =
-        _unreadOnly ? notifications.where((n) => !n.isRead).toList() : notifications;
+    final filtered = _unreadOnly
+        ? notifications.where((n) => !n.isRead).toList()
+        : notifications;
+
+    final canPop = Navigator.canPop(context);
 
     return Scaffold(
       backgroundColor: AdminUiColors.scaffoldBackground,
@@ -34,9 +37,10 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
               child: GradientHeader(
                 child: Stack(
                   children: [
-                    const HeaderTitleBlock(
+                    HeaderTitleBlock(
                       title: 'Notifications',
                       subtitle: 'Stay updated with alerts',
+                      onBack: canPop ? () => Navigator.of(context).pop() : null,
                     ),
                     Positioned(
                       top: 0,
@@ -48,7 +52,9 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                         ),
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          borderRadius: BorderRadius.circular(AdminUiRadii.chip),
+                          borderRadius: BorderRadius.circular(
+                            AdminUiRadii.chip,
+                          ),
                         ),
                         child: Text(
                           '$unreadCount new',
@@ -99,18 +105,21 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                 child: SizedBox(
                   width: double.infinity,
                   child: OutlinedButton(
-                    onPressed: () =>
-                        ref.read(notificationsProvider.notifier).markAllAsRead(),
+                    onPressed: () => ref
+                        .read(notificationsProvider.notifier)
+                        .markAllAsRead(),
                     child: const Text('Mark All as Read'),
                   ),
                 ),
               ),
             ),
             SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: AdminUiSpacing.md),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AdminUiSpacing.md,
+              ),
               sliver: SliverList.separated(
                 itemCount: filtered.length,
-                separatorBuilder: (_, __) =>
+                separatorBuilder: (_, _) =>
                     const SizedBox(height: AdminUiSpacing.sm),
                 itemBuilder: (context, index) => _NotificationCard(
                   notification: filtered[index],
@@ -120,7 +129,9 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                 ),
               ),
             ),
-            const SliverToBoxAdapter(child: SizedBox(height: AdminUiSpacing.lg)),
+            const SliverToBoxAdapter(
+              child: SizedBox(height: AdminUiSpacing.lg),
+            ),
           ],
         ),
       ),
@@ -149,10 +160,14 @@ class _FilterTab extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 12),
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: selected ? AdminUiColors.primaryOrange : AdminUiColors.cardBackground,
+          color: selected
+              ? AdminUiColors.primaryOrange
+              : AdminUiColors.cardBackground,
           borderRadius: BorderRadius.circular(AdminUiRadii.button),
           border: Border.all(
-            color: selected ? AdminUiColors.primaryOrange : AdminUiColors.borderSubtle,
+            color: selected
+                ? AdminUiColors.primaryOrange
+                : AdminUiColors.borderSubtle,
           ),
         ),
         child: Text(

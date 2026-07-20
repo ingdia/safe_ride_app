@@ -77,7 +77,7 @@ class FleetBusCard extends StatelessWidget {
                   children: [
                     _InlineMeta(
                       icon: Icons.groups_2_outlined,
-                      text: '${summary.studentCount} students',
+                      text: '${summary.capacity} students',
                     ),
                     _InlineMeta(
                       icon: Icons.location_on_outlined,
@@ -102,8 +102,8 @@ class FleetBusCard extends StatelessWidget {
                       if (onDelete != null)
                         RoundIconButton(
                           icon: Icons.delete_outline,
-                          background: AdminUiColors.delayedBg,
-                          foreground: AdminUiColors.delayedFg,
+                          background: AdminUiColors.dangerBg,
+                          foreground: AdminUiColors.dangerFg,
                           onTap: onDelete!,
                         ),
                     ],
