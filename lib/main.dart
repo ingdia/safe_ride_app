@@ -1,20 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-<<<<<<< HEAD
 import 'core/routing/app_router.dart';
 import 'features/parent/presentation/widgets/parent_ui_constants.dart';
 
 void main() {
-=======
-import 'core/storage/hive_boxes.dart';
-import 'features/parent/presentation/screens/parent_navigation_shell.dart';
-import 'features/parent/presentation/widgets/parent_ui_constants.dart';
-
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await initHive();
->>>>>>> 19d165199753a305744625bfe0dad9dd69efa725
   runApp(const ProviderScope(child: SafeRideApp()));
 }
 
@@ -44,7 +34,6 @@ class SafeRideApp extends StatelessWidget {
           ),
         ),
       ),
-<<<<<<< HEAD
       initialRoute: '/',
       onGenerateRoute: (settings) {
         if (settings.name == '/') {
@@ -160,9 +149,6 @@ class _SplashScreenState extends State<SplashScreen>
           ),
         ),
       ),
-=======
-      home: const ParentNavigationShell(),
->>>>>>> 19d165199753a305744625bfe0dad9dd69efa725
     );
   }
 }

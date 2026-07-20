@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 /// Centralised validation functions used across auth screens.
 class AppValidators {
   const AppValidators._();
@@ -29,6 +28,3 @@ class AppValidators {
     return null;
   }
 }
-=======
-
->>>>>>> 19d165199753a305744625bfe0dad9dd69efa725
