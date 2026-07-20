@@ -9,11 +9,7 @@ class BusFormSheet extends ConsumerStatefulWidget {
   final BusModel? existingBus;
   final String schoolId;
 
-  const BusFormSheet({
-    super.key,
-    this.existingBus,
-    required this.schoolId,
-  });
+  const BusFormSheet({super.key, this.existingBus, required this.schoolId});
 
   static Future<BusModel?> show(
     BuildContext context, {
@@ -24,10 +20,8 @@ class BusFormSheet extends ConsumerStatefulWidget {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => BusFormSheet(
-        existingBus: existingBus,
-        schoolId: schoolId,
-      ),
+      builder: (_) =>
+          BusFormSheet(existingBus: existingBus, schoolId: schoolId),
     );
   }
 
@@ -44,8 +38,9 @@ class _BusFormSheetState extends ConsumerState<BusFormSheet> {
   @override
   void initState() {
     super.initState();
-    _plateController =
-        TextEditingController(text: widget.existingBus?.plateNumber ?? '');
+    _plateController = TextEditingController(
+      text: widget.existingBus?.plateNumber ?? '',
+    );
     _capacityController = TextEditingController(
       text: widget.existingBus?.capacity.toString() ?? '',
     );
@@ -66,17 +61,14 @@ class _BusFormSheetState extends ConsumerState<BusFormSheet> {
         .where((u) => u.role == UserRole.driver)
         .toList();
     final isEditing = widget.existingBus != null;
-    final validDriverId =
-        drivers.any((d) => d.userId == _selectedDriverId)
-            ? _selectedDriverId
-            : null;
+    final validDriverId = drivers.any((d) => d.userId == _selectedDriverId)
+        ? _selectedDriverId
+        : null;
 
-    // Bottom sheets have a fixed height budget, and that budget shrinks a
-    // lot in landscape mode or when the keyboard is open. Wrapping the form
-    // in a SingleChildScrollView (instead of a bare, non-scrolling Column)
-    // prevents a RenderFlex "bottom overflowed" error in those cases.
     return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
       child: Container(
         constraints: BoxConstraints(
           maxHeight: MediaQuery.of(context).size.height * 0.9,
@@ -98,65 +90,71 @@ class _BusFormSheetState extends ConsumerState<BusFormSheet> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: AdminUiSpacing.md),
-                  decoration: BoxDecoration(
-                    color: AdminUiColors.divider,
-                    borderRadius: BorderRadius.circular(4),
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: AdminUiSpacing.md),
+                    decoration: BoxDecoration(
+                      color: AdminUiColors.divider,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
                   ),
                 ),
-              ),
-              Text(
-                isEditing ? 'Edit Bus' : 'Add New Bus',
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: AdminUiSpacing.md),
-              TextFormField(
-                controller: _plateController,
-                decoration: const InputDecoration(labelText: 'Plate Number'),
-                validator: (v) => (v == null || v.trim().isEmpty)
-                    ? 'Plate number is required'
-                    : null,
-              ),
-              const SizedBox(height: AdminUiSpacing.sm),
-              TextFormField(
-                controller: _capacityController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Capacity'),
-                validator: (v) {
-                  final parsed = int.tryParse(v ?? '');
-                  if (parsed == null || parsed <= 0) {
-                    return 'Enter a valid capacity';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: AdminUiSpacing.sm),
-              DropdownButtonFormField<String>(
-                value: validDriverId,
-                decoration: const InputDecoration(labelText: 'Assigned Driver'),
-                items: drivers
-                    .map(
-                      (d) => DropdownMenuItem(
-                        value: d.userId,
-                        child: Text(d.name),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (value) => setState(() => _selectedDriverId = value),
-                validator: (v) => v == null ? 'Select a driver' : null,
-              ),
-              const SizedBox(height: AdminUiSpacing.lg),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _submit,
-                  child: Text(isEditing ? 'Save Changes' : 'Add Bus'),
+                Text(
+                  isEditing ? 'Edit Bus' : 'Add New Bus',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-              ),
+                const SizedBox(height: AdminUiSpacing.md),
+                TextFormField(
+                  controller: _plateController,
+                  decoration: const InputDecoration(labelText: 'Plate Number'),
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? 'Plate number is required'
+                      : null,
+                ),
+                const SizedBox(height: AdminUiSpacing.sm),
+                TextFormField(
+                  controller: _capacityController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Capacity'),
+                  validator: (v) {
+                    final parsed = int.tryParse(v ?? '');
+                    if (parsed == null || parsed <= 0) {
+                      return 'Enter a valid capacity';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: AdminUiSpacing.sm),
+                DropdownButtonFormField<String>(
+                  initialValue: validDriverId,
+                  decoration: const InputDecoration(
+                    labelText: 'Assigned Driver',
+                  ),
+                  items: drivers
+                      .map(
+                        (d) => DropdownMenuItem(
+                          value: d.userId,
+                          child: Text(d.name),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) =>
+                      setState(() => _selectedDriverId = value),
+                  validator: (v) => v == null ? 'Select a driver' : null,
+                ),
+                const SizedBox(height: AdminUiSpacing.lg),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _submit,
+                    child: Text(isEditing ? 'Save Changes' : 'Add Bus'),
+                  ),
+                ),
               ],
             ),
           ),
@@ -168,7 +166,8 @@ class _BusFormSheetState extends ConsumerState<BusFormSheet> {
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
     final bus = BusModel(
-      busId: widget.existingBus?.busId ??
+      busId:
+          widget.existingBus?.busId ??
           'bus-${DateTime.now().microsecondsSinceEpoch}',
       plateNumber: _plateController.text.trim(),
       capacity: int.parse(_capacityController.text.trim()),

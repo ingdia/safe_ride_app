@@ -8,11 +8,7 @@ class RouteFormSheet extends ConsumerStatefulWidget {
   final RouteModel? existingRoute;
   final String schoolId;
 
-  const RouteFormSheet({
-    super.key,
-    this.existingRoute,
-    required this.schoolId,
-  });
+  const RouteFormSheet({super.key, this.existingRoute, required this.schoolId});
 
   static Future<RouteModel?> show(
     BuildContext context, {
@@ -23,10 +19,8 @@ class RouteFormSheet extends ConsumerStatefulWidget {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => RouteFormSheet(
-        existingRoute: existingRoute,
-        schoolId: schoolId,
-      ),
+      builder: (_) =>
+          RouteFormSheet(existingRoute: existingRoute, schoolId: schoolId),
     );
   }
 
@@ -43,13 +37,16 @@ class _RouteFormSheetState extends ConsumerState<RouteFormSheet> {
   @override
   void initState() {
     super.initState();
-    _nameController =
-        TextEditingController(text: widget.existingRoute?.name ?? '');
+    _nameController = TextEditingController(
+      text: widget.existingRoute?.name ?? '',
+    );
     _selectedBusId = widget.existingRoute?.busId;
     final existingStops = widget.existingRoute?.stops ?? const [];
     _stopControllers = existingStops.isEmpty
         ? [TextEditingController()]
-        : existingStops.map((s) => TextEditingController(text: s.name)).toList();
+        : existingStops
+              .map((s) => TextEditingController(text: s.name))
+              .toList();
   }
 
   @override
@@ -76,11 +73,14 @@ class _RouteFormSheetState extends ConsumerState<RouteFormSheet> {
   Widget build(BuildContext context) {
     final buses = ref.watch(busesProvider);
     final isEditing = widget.existingRoute != null;
-    final validBusId =
-        buses.any((b) => b.busId == _selectedBusId) ? _selectedBusId : null;
+    final validBusId = buses.any((b) => b.busId == _selectedBusId)
+        ? _selectedBusId
+        : null;
 
     return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
       child: DraggableScrollableSheet(
         initialChildSize: 0.85,
         minChildSize: 0.5,
@@ -131,8 +131,10 @@ class _RouteFormSheetState extends ConsumerState<RouteFormSheet> {
                   ),
                   const SizedBox(height: AdminUiSpacing.sm),
                   DropdownButtonFormField<String>(
-                    value: validBusId,
-                    decoration: const InputDecoration(labelText: 'Assigned Bus'),
+                    initialValue: validBusId,
+                    decoration: const InputDecoration(
+                      labelText: 'Assigned Bus',
+                    ),
                     items: buses
                         .map(
                           (b) => DropdownMenuItem(
@@ -141,7 +143,8 @@ class _RouteFormSheetState extends ConsumerState<RouteFormSheet> {
                           ),
                         )
                         .toList(),
-                    onChanged: (value) => setState(() => _selectedBusId = value),
+                    onChanged: (value) =>
+                        setState(() => _selectedBusId = value),
                     validator: (v) => v == null ? 'Select a bus' : null,
                   ),
                   const SizedBox(height: AdminUiSpacing.md),
@@ -170,8 +173,9 @@ class _RouteFormSheetState extends ConsumerState<RouteFormSheet> {
                           Expanded(
                             child: TextFormField(
                               controller: _stopControllers[i],
-                              decoration:
-                                  InputDecoration(labelText: 'Stop ${i + 1} Name'),
+                              decoration: InputDecoration(
+                                labelText: 'Stop ${i + 1} Name',
+                              ),
                               validator: (v) => (v == null || v.trim().isEmpty)
                                   ? 'Required'
                                   : null,
@@ -217,7 +221,8 @@ class _RouteFormSheetState extends ConsumerState<RouteFormSheet> {
         ),
     ];
     final route = RouteModel(
-      routeId: widget.existingRoute?.routeId ??
+      routeId:
+          widget.existingRoute?.routeId ??
           'route-${DateTime.now().microsecondsSinceEpoch}',
       schoolId: widget.schoolId,
       busId: _selectedBusId!,

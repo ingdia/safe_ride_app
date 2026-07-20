@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../data/models/bus_model.dart';
 import '../providers/buses_provider.dart';
+import '../providers/drivers_provider.dart';
 import '../providers/fleet_overview_provider.dart';
 import '../providers/notifications_provider.dart';
 import '../providers/schools_provider.dart';
@@ -11,6 +13,7 @@ import '../widgets/fleet_bus_card.dart';
 import '../widgets/notification_tile.dart';
 import '../widgets/bus_form_sheet.dart';
 import 'manage_routes_screen.dart';
+import 'pending_drivers_screen.dart';
 import 'reports_analytics_screen.dart';
 
 class FleetOverviewScreen extends ConsumerWidget {
@@ -30,8 +33,22 @@ class FleetOverviewScreen extends ConsumerWidget {
     String busId,
   ) async {
     final school = ref.read(schoolProvider);
-    final existing =
-        ref.read(busesProvider).firstWhere((b) => b.busId == busId);
+    final buses = ref.read(busesProvider);
+    BusModel? existing;
+    for (final bus in buses) {
+      if (bus.busId == busId) {
+        existing = bus;
+        break;
+      }
+    }
+    if (existing == null) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('This bus no longer exists')),
+        );
+      }
+      return;
+    }
     final result = await BusFormSheet.show(
       context,
       existingBus: existing,
@@ -51,7 +68,9 @@ class FleetOverviewScreen extends ConsumerWidget {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Remove Bus'),
-        content: const Text('Are you sure you want to remove this bus from the fleet?'),
+        content: const Text(
+          'Are you sure you want to remove this bus from the fleet?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -74,6 +93,7 @@ class FleetOverviewScreen extends ConsumerWidget {
     final summaries = ref.watch(fleetSummaryProvider);
     final stats = ref.watch(fleetStatsProvider);
     final notifications = ref.watch(notificationsProvider).take(3).toList();
+    final pendingDriverCount = ref.watch(pendingDriversCountProvider);
 
     return Scaffold(
       backgroundColor: AdminUiColors.scaffoldBackground,
@@ -130,10 +150,12 @@ class FleetOverviewScreen extends ConsumerWidget {
               ),
             ),
             SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: AdminUiSpacing.md),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AdminUiSpacing.md,
+              ),
               sliver: SliverList.separated(
                 itemCount: summaries.length,
-                separatorBuilder: (_, __) =>
+                separatorBuilder: (_, _) =>
                     const SizedBox(height: AdminUiSpacing.sm),
                 itemBuilder: (context, index) => Center(
                   child: ConstrainedBox(
@@ -142,8 +164,11 @@ class FleetOverviewScreen extends ConsumerWidget {
                       summary: summaries[index],
                       onEdit: () =>
                           _handleEditBus(context, ref, summaries[index].busId),
-                      onDelete: () =>
-                          _handleDeleteBus(context, ref, summaries[index].busId),
+                      onDelete: () => _handleDeleteBus(
+                        context,
+                        ref,
+                        summaries[index].busId,
+                      ),
                     ),
                   ),
                 ),
@@ -161,10 +186,12 @@ class FleetOverviewScreen extends ConsumerWidget {
               ),
             ),
             SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: AdminUiSpacing.md),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AdminUiSpacing.md,
+              ),
               sliver: SliverList.separated(
                 itemCount: notifications.length,
-                separatorBuilder: (_, __) =>
+                separatorBuilder: (_, _) =>
                     const SizedBox(height: AdminUiSpacing.sm),
                 itemBuilder: (context, index) =>
                     AlertPreviewTile(notification: notifications[index]),
@@ -185,7 +212,21 @@ class FleetOverviewScreen extends ConsumerWidget {
                           );
                         },
                         icon: const Icon(Icons.settings_outlined, size: 18),
-                        label: const Text('Manage Routes'),
+                        label: const Text('Routes'),
+                      ),
+                    ),
+                    const SizedBox(width: AdminUiSpacing.sm),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const PendingDriversScreen(),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.badge_outlined, size: 18),
+                        label: Text('Drivers ($pendingDriverCount)'),
                       ),
                     ),
                     const SizedBox(width: AdminUiSpacing.sm),
@@ -199,14 +240,16 @@ class FleetOverviewScreen extends ConsumerWidget {
                           );
                         },
                         icon: const Icon(Icons.bar_chart_rounded, size: 18),
-                        label: const Text('View Reports'),
+                        label: const Text('Reports'),
                       ),
                     ),
                   ],
                 ),
               ),
             ),
-            const SliverToBoxAdapter(child: SizedBox(height: AdminUiSpacing.lg)),
+            const SliverToBoxAdapter(
+              child: SizedBox(height: AdminUiSpacing.lg),
+            ),
           ],
         ),
       ),

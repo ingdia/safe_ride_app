@@ -3,27 +3,30 @@ import 'package:flutter/material.dart';
 class AdminUiColors {
   AdminUiColors._();
 
-  static const Color primaryOrange = Color(0xFFF97316);
-  static const Color primaryOrangeDark = Color(0xFFC2410C);
-  static const Color primaryOrangeLight = Color(0xFFFFA94D);
+  static const Color primaryOrange = Color(0xFFF59E0B);
+  static const Color primaryOrangeDark = Color(0xFFB45309);
+  static const Color primaryOrangeLight = Color(0xFFFCD34D);
 
-  static const Color scaffoldBackground = Color(0xFFF7F7F9);
+  static const Color scaffoldBackground = Color(0xFFF9FAFB);
   static const Color cardBackground = Color(0xFFFFFFFF);
-  static const Color statCardBackground = Color(0xFFFFF3E6);
+  static const Color statCardBackground = Color(0xFFFFFBEB);
 
-  static const Color onTimeBg = Color(0xFFE7F7EE);
-  static const Color onTimeFg = Color(0xFF1E9E5A);
-  static const Color delayedBg = Color(0xFFFFF3E0);
-  static const Color delayedFg = Color(0xFFE08A00);
-  static const Color infoBg = Color(0xFFE8F1FF);
-  static const Color infoFg = Color(0xFF2F6FED);
+  static const Color onTimeBg = Color(0xFFDCFCE7);
+  static const Color onTimeFg = Color(0xFF16A34A);
+  static const Color delayedBg = Color(0xFFFEF3C7);
+  static const Color delayedFg = Color(0xFFD97706);
+  static const Color infoBg = Color(0xFFDBEAFE);
+  static const Color infoFg = Color(0xFF2563EB);
 
-  static const Color textPrimary = Color(0xFF1F2430);
-  static const Color textSecondary = Color(0xFF7C8393);
+  static const Color dangerBg = Color(0xFFFEE2E2);
+  static const Color dangerFg = Color(0xFFDC2626);
+
+  static const Color textPrimary = Color(0xFF1F2937);
+  static const Color textSecondary = Color(0xFF6B7280);
   static const Color textOnDark = Color(0xFFFFFFFF);
 
-  static const Color borderSubtle = Color(0xFFF1D9B8);
-  static const Color divider = Color(0xFFECECEF);
+  static const Color borderSubtle = Color(0xFFFEF3C7);
+  static const Color divider = Color(0xFFE5E7EB);
 }
 
 class AdminUiRadii {
@@ -107,9 +110,7 @@ class AdminTheme {
             if (states.contains(WidgetState.hovered)) return 4;
             return 0;
           }),
-          mouseCursor: const WidgetStatePropertyAll(
-            SystemMouseCursors.click,
-          ),
+          mouseCursor: const WidgetStatePropertyAll(SystemMouseCursors.click),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
@@ -138,9 +139,7 @@ class AdminTheme {
             }
             return null;
           }),
-          mouseCursor: const WidgetStatePropertyAll(
-            SystemMouseCursors.click,
-          ),
+          mouseCursor: const WidgetStatePropertyAll(SystemMouseCursors.click),
         ),
       ),
     );

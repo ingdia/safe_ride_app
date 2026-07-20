@@ -11,7 +11,8 @@ class GradientHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: padding ??
+      padding:
+          padding ??
           const EdgeInsets.fromLTRB(
             AdminUiSpacing.md,
             AdminUiSpacing.lg,
@@ -22,7 +23,10 @@ class GradientHeader extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [AdminUiColors.primaryOrange, AdminUiColors.primaryOrangeDark],
+          colors: [
+            AdminUiColors.primaryOrange,
+            AdminUiColors.primaryOrangeDark,
+          ],
         ),
         borderRadius: BorderRadius.only(
           bottomLeft: Radius.circular(24),
@@ -38,12 +42,14 @@ class HeaderTitleBlock extends StatelessWidget {
   final String title;
   final String subtitle;
   final VoidCallback? onBack;
+  final String backLabel;
 
   const HeaderTitleBlock({
     super.key,
     required this.title,
     required this.subtitle,
     this.onBack,
+    this.backLabel = 'Back to Dashboard',
   });
 
   @override
@@ -57,16 +63,16 @@ class HeaderTitleBlock extends StatelessWidget {
             borderRadius: BorderRadius.circular(8),
             hoverColor: Colors.white.withValues(alpha: 0.1),
             mouseCursor: SystemMouseCursors.click,
-            child: const Padding(
-              padding: EdgeInsets.symmetric(vertical: 6),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.arrow_back, color: Colors.white, size: 18),
-                  SizedBox(width: 6),
+                  const Icon(Icons.arrow_back, color: Colors.white, size: 18),
+                  const SizedBox(width: 6),
                   Text(
-                    'Back to Dashboard',
-                    style: TextStyle(color: Colors.white, fontSize: 13),
+                    backLabel,
+                    style: const TextStyle(color: Colors.white, fontSize: 13),
                   ),
                 ],
               ),
