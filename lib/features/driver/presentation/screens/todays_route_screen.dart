@@ -7,6 +7,7 @@ import '../../../../core/theme/app_text_styles.dart';
 import '../../domain/models/route_stop.dart';
 import '../bloc/driver_route_bloc.dart';
 import '../bloc/driver_route_state.dart';
+import 'offline_attendance_screen.dart';
 
 /// Driver's "Today's Route" screen.
 ///
@@ -268,28 +269,49 @@ class TodaysRouteScreen extends StatelessWidget {
   Widget _buildStartRouteButton(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-      child: SizedBox(
-        width: double.infinity,
-        height: AppSpacing.tapTargetMin + 8, // >= 48dp Material tap target
-        child: ElevatedButton.icon(
-          onPressed: () {
-            // TODO(Task 2): Check GPS status via DriverRouteBloc,
-            // then navigate to the Active Route screen (Fig. 5 flow).
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Starting route…')),
-            );
-          },
-          icon: const Icon(Icons.navigation_rounded),
-          label: const Text('Start Route'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primary,
-            foregroundColor: Colors.white,
-            textStyle: AppTextStyles.buttonLabel,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: double.infinity,
+            height: AppSpacing.tapTargetMin + 8, // >= 48dp Material tap target
+            child: ElevatedButton.icon(
+              onPressed: () {
+                // TODO(Task 2): Check GPS status via DriverRouteBloc,
+                // then navigate to the Active Route screen (Fig. 5 flow).
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Starting route…')),
+                );
+              },
+              icon: const Icon(Icons.navigation_rounded),
+              label: const Text('Start Route'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                textStyle: AppTextStyles.buttonLabel,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                ),
+              ),
             ),
           ),
-        ),
+          const SizedBox(height: AppSpacing.sm),
+          SizedBox(
+            width: double.infinity,
+            height: AppSpacing.tapTargetMin + 8,
+            child: OutlinedButton.icon(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const OfflineAttendanceScreen(),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.cloud_off_outlined),
+              label: const Text('Go to Offline Attendance'),
+            ),
+          ),
+        ],
       ),
     );
   }
