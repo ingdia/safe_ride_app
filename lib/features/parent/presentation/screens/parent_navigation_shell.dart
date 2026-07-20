@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../providers/parent_navigation_provider.dart'; 
 import '../widgets/parent_ui_constants.dart';
 import 'parent_home_screen.dart';
 import 'parent_notifications_screen.dart';
