@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'core/storage/hive_boxes.dart';
 import 'features/parent/presentation/screens/parent_navigation_shell.dart';
 import 'features/parent/presentation/widgets/parent_ui_constants.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await initHive();
   runApp(const ProviderScope(child: SafeRideApp()));
 }
 
