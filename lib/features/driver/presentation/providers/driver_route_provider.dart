@@ -4,11 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../shared/providers/attendance_cache_provider.dart';
 import '../../../../shared/providers/connectivity_provider.dart';
-import '../../data/datasources/attendance_cache_service.dart';
 import '../../data/models/cached_attendance_record.dart';
 import '../../data/repositories/mock_driver_repository.dart';
 import '../../domain/models/student.dart';
-import '../../domain/repositories/driver_repository.dart';
 import 'driver_route_state.dart';
 
 final driverRouteProvider = AsyncNotifierProvider<DriverRouteNotifier, DriverRouteState>(
@@ -16,29 +14,25 @@ final driverRouteProvider = AsyncNotifierProvider<DriverRouteNotifier, DriverRou
 );
 
 class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
-  late final DriverRepository repository;
-  late final AttendanceCacheService cacheService;
-  late final bool isOnline;
-
   @override
   FutureOr<DriverRouteState> build() async {
-    repository = MockDriverRepository();
-    cacheService = ref.read(attendanceCacheProvider);
-    isOnline = ref.watch(connectivityProvider).maybeWhen(
-      data: (value) => value,
-      orElse: () => true,
-    );
-
     return _loadRoute();
   }
 
   Future<DriverRouteState> _loadRoute() async {
+    final repository = MockDriverRepository();
+    final cacheService = ref.read(attendanceCacheProvider);
+    ref.watch(connectivityProvider).maybeWhen(
+      data: (value) => value,
+      orElse: () => true,
+    );
+
     state = const AsyncLoading<DriverRouteState>();
     try {
       final stops = await repository.fetchRouteStops();
       final students = await repository.fetchRouteStudents();
 
-      final cached = cacheService.loadAll();
+      final cached = await cacheService.loadAll();
       final merged = students.map((student) {
         final record = cached[student.id];
         if (record == null) return student;
@@ -64,6 +58,13 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
   }) async {
     final currentState = state.value;
     if (currentState is! DriverRouteLoaded) return;
+
+    final repository = MockDriverRepository();
+    final cacheService = ref.read(attendanceCacheProvider);
+    final isOnline = ref.watch(connectivityProvider).maybeWhen(
+      data: (value) => value,
+      orElse: () => true,
+    );
 
     state = const AsyncLoading<DriverRouteState>();
 

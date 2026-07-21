@@ -2,27 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../shared/widgets/app_navigation_shell.dart';
+import '../providers/admin_navigation_provider.dart';
 import 'admin_dashboard_screen.dart';
 import 'admin_buses_screen.dart';
 import 'admin_emergency_screen.dart';
 import 'admin_users_screen.dart';
 import 'admin_settings_screen.dart';
-
-// ---------------------------------------------------------------------------
-// Local state holder for the 5-tab admin navigation layout
-// ---------------------------------------------------------------------------
-
-final _adminTabIndexProvider =
-    NotifierProvider<_AdminTabIndexController, int>(
-  _AdminTabIndexController.new,
-);
-
-class _AdminTabIndexController extends Notifier<int> {
-  @override
-  int build() => 0;
-
-  void selectTab(int index) => state = index;
-}
 
 // ---------------------------------------------------------------------------
 // Admin navigation shell — wraps admin screens with bottom nav bar
@@ -71,12 +56,16 @@ class AdminNavigationShell extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final selectedIndex = ref.watch(_adminTabIndexProvider);
+    final selectedTab = ref.watch(adminNavigationProvider);
+    final selectedIndex = selectedTab.index;
 
     return AppNavigationShell(
       selectedIndex: selectedIndex,
-      onTabSelected: (int index) =>
-          ref.read(_adminTabIndexProvider.notifier).selectTab(index),
+      onTabSelected: (int index) {
+        ref.read(adminNavigationProvider.notifier).selectTab(
+          adminTabFromIndex(index),
+        );
+      },
       items: _items,
       child: IndexedStack(
         index: selectedIndex,
