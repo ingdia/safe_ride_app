@@ -32,7 +32,7 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
       final stops = await repository.fetchRouteStops();
       final students = await repository.fetchRouteStudents();
 
-      final cached = cacheService.loadAll();
+      final cached = await cacheService.loadAll();
       final merged = students.map((student) {
         final record = cached[student.id];
         if (record == null) return student;
