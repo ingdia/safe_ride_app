@@ -42,5 +42,5 @@ void main() {
 
 /// Thin subclass that exposes the private `_isOnline` helper for unit testing.
 class _TestableConnectivityService extends ConnectivityService {
-  bool testIsOnline(List<ConnectivityResult> results) => isOnlineFromResults(results);
+  bool testIsOnline(List<dynamic> results) => isOnlineFromResults(results);
 }

@@ -1,5 +1,7 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:safe_ride_app/main.dart';
 import 'package:safe_ride_app/features/driver/data/repositories/mock_driver_repository.dart';
 import 'package:safe_ride_app/features/driver/domain/models/student.dart';
 import 'package:safe_ride_app/features/driver/presentation/bloc/driver_route_bloc.dart';
@@ -9,6 +11,13 @@ import 'package:safe_ride_app/features/driver/presentation/bloc/driver_route_sta
 import 'helpers/fake_attendance_cache_service.dart';
 
 void main() {
+  // Your basic smoke test
+  testWidgets('SafeRideApp smoke test', (WidgetTester tester) async {
+    await tester.pumpWidget(const ProviderScope(child: SafeRideApp()));
+    expect(find.byType(SafeRideApp), findsOneWidget);
+  });
+
+  // Your colleague's attendance test
   test('attendance updates emit progress metadata', () async {
     final bloc = DriverRouteBloc(
       repository: MockDriverRepository(),
