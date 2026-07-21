@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../domain/models/route_stop.dart';
-import '../bloc/driver_route_bloc.dart';
-import '../bloc/driver_route_state.dart';
+import '../providers/driver_route_provider.dart';
+import '../providers/driver_route_state.dart';
 import 'offline_attendance_screen.dart';
 
 /// Driver's "Today's Route" screen.
@@ -17,7 +17,7 @@ import 'offline_attendance_screen.dart';
 ///
 /// NOTE: Data is currently static/mocked. This will be wired to
 /// `DriverRouteBloc` in Task 2 (feature/driver-bloc) — see the TODOs below.
-class TodaysRouteScreen extends StatelessWidget {
+class TodaysRouteScreen extends ConsumerWidget {
   const TodaysRouteScreen({super.key});
 
   // TODO(Task 2): Replace with real route metadata from the bloc when available.
@@ -28,20 +28,22 @@ class TodaysRouteScreen extends StatelessWidget {
       stops.fold(0, (sum, stop) => sum + stop.studentCount);
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(driverRouteProvider);
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
-        child: BlocBuilder<DriverRouteBloc, DriverRouteState>(
-          builder: (context, state) {
-            if (state is DriverRouteLoading || state is DriverRouteInitial) {
+        child: state.when(
+          data: (routeState) {
+            if (routeState is DriverRouteLoading || routeState is DriverRouteInitial) {
               return const Center(child: CircularProgressIndicator());
             }
 
-            if (state is DriverRouteError) {
+            if (routeState is DriverRouteError) {
               return Center(
                 child: Text(
-                  'Unable to load route: ${state.message}',
+                  'Unable to load route: ${routeState.message}',
                   textAlign: TextAlign.center,
                   style: AppTextStyles.bodyMedium.copyWith(
                     color: AppColors.textSecondary,
@@ -50,7 +52,7 @@ class TodaysRouteScreen extends StatelessWidget {
               );
             }
 
-            final loadedState = state as DriverRouteLoaded;
+            final loadedState = routeState as DriverRouteLoaded;
             final stops = loadedState.stops;
             final progress = (loadedState.routeProgress * 100).round();
 
@@ -86,6 +88,16 @@ class TodaysRouteScreen extends StatelessWidget {
               ],
             );
           },
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (error, stack) => Center(
+            child: Text(
+              'Unable to load route: $error',
+              textAlign: TextAlign.center,
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
         ),
       ),
       floatingActionButton: _buildStartRouteButton(context),

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../bloc/driver_route_bloc.dart';
-import '../bloc/driver_route_state.dart';
 import '../../domain/models/route_stop.dart';
+import '../providers/driver_route_provider.dart';
+import '../providers/driver_route_state.dart';
 
 /// -----------------------------------------------------------------------
 /// DriverMapScreen
@@ -24,14 +24,14 @@ import '../../domain/models/route_stop.dart';
 /// fully interactive.
 /// -----------------------------------------------------------------------
 
-class DriverMapScreen extends StatefulWidget {
+class DriverMapScreen extends ConsumerStatefulWidget {
   const DriverMapScreen({super.key});
 
   @override
-  State<DriverMapScreen> createState() => _DriverMapScreenState();
+  ConsumerState<DriverMapScreen> createState() => _DriverMapScreenState();
 }
 
-class _DriverMapScreenState extends State<DriverMapScreen> {
+class _DriverMapScreenState extends ConsumerState<DriverMapScreen> {
   // Brand palette (amber / white / gray) per Design Decisions section.
   static const Color _amber = Color(0xFFF5A623);
   static const Color _amberDark = Color(0xFFE8890C);
@@ -47,23 +47,23 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
           children: [
             _buildHeader(),
             Expanded(
-              child: BlocBuilder<DriverRouteBloc, DriverRouteState>(
-                builder: (context, state) {
-                  if (state is DriverRouteLoading || state is DriverRouteInitial) {
+              child: ref.watch(driverRouteProvider).when(
+                data: (value) {
+                  if (value is DriverRouteLoading || value is DriverRouteInitial) {
                     return const Center(child: CircularProgressIndicator());
                   }
 
-                  if (state is DriverRouteError) {
+                  if (value is DriverRouteError) {
                     return Center(
                       child: Text(
-                        'Unable to load route: ${state.message}',
+                        'Unable to load route: ${value.message}',
                         textAlign: TextAlign.center,
                         style: TextStyle(color: Colors.grey[700]),
                       ),
                     );
                   }
 
-                  final loadedState = state as DriverRouteLoaded;
+                  final loadedState = value as DriverRouteLoaded;
                   final stops = loadedState.stops;
 
                   return LayoutBuilder(
@@ -85,6 +85,14 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
                     },
                   );
                 },
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (error, stack) => Center(
+                  child: Text(
+                    'Unable to load route: $error',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.grey[700]),
+                  ),
+                ),
               ),
             ),
           ],
