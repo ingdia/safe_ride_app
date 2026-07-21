@@ -1076,7 +1076,7 @@ class _DialogSwitchTile extends StatelessWidget {
     return SwitchListTile(
       value: value,
       onChanged: onChanged,
-      activeColor: ParentUiColors.orange,
+      activeThumbColor: ParentUiColors.orange,
       title: Text(
         title,
         style: ParentUiTextStyles.body.copyWith(fontWeight: FontWeight.w900),

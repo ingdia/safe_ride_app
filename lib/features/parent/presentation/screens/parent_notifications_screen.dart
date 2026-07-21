@@ -70,6 +70,12 @@ class _NotificationsContent extends StatelessWidget {
                             ),
                             child: _NotificationCard(
                               notification: notification,
+                              onTap: () {
+                                _showNotificationDetailsDialog(
+                                  context,
+                                  notification,
+                                );
+                              },
                             ),
                           );
                         }),
@@ -231,131 +237,119 @@ class _MarkAllAsReadButton extends StatelessWidget {
 }
 
 class _NotificationCard extends StatelessWidget {
-  const _NotificationCard({required this.notification});
+  const _NotificationCard({required this.notification, required this.onTap});
 
   final ParentNotificationEntity notification;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final style = _notificationStyle(notification.type);
+    final style = _notificationDialogStyle(notification.type);
     final isUnread = !notification.isRead;
 
-    return Container(
-      padding: const EdgeInsets.all(ParentUiSpacing.lg),
-      decoration: BoxDecoration(
-        color: Colors.white,
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(22),
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(
-          color: isUnread ? ParentUiColors.orange : ParentUiColors.border,
-          width: isUnread ? 2 : 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Stack(
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                height: 50,
-                width: 50,
-                decoration: BoxDecoration(
-                  color: style.backgroundColor,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(style.icon, color: style.iconColor, size: 28),
-              ),
-              const SizedBox(width: ParentUiSpacing.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      notification.title,
-                      style: ParentUiTextStyles.heading.copyWith(fontSize: 22),
-                    ),
-                    const SizedBox(height: ParentUiSpacing.xs),
-                    Text(
-                      notification.message,
-                      style: ParentUiTextStyles.body.copyWith(
-                        color: const Color(0xFF334155),
-                        height: 1.35,
-                      ),
-                    ),
-                    const SizedBox(height: ParentUiSpacing.sm),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.access_time_rounded,
-                          color: ParentUiColors.textSecondary,
-                          size: 18,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          notification.time,
-                          style: ParentUiTextStyles.caption.copyWith(
-                            color: ParentUiColors.textSecondary,
-                          ),
-                        ),
-                        const Spacer(),
-                        if (isUnread)
-                          Text(
-                            'Mark read',
-                            style: ParentUiTextStyles.caption.copyWith(
-                              color: ParentUiColors.darkOrange,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ],
-                ),
+        child: Ink(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(
+              color: isUnread ? ParentUiColors.orange : ParentUiColors.border,
+              width: isUnread ? 2 : 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.08),
+                blurRadius: 10,
+                offset: const Offset(0, 5),
               ),
             ],
           ),
-          if (isUnread)
-            const Positioned(
-              right: 2,
-              top: 2,
-              child: CircleAvatar(
-                radius: 6,
-                backgroundColor: ParentUiColors.orange,
-              ),
+          child: Padding(
+            padding: const EdgeInsets.all(ParentUiSpacing.lg),
+            child: Stack(
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      height: 50,
+                      width: 50,
+                      decoration: BoxDecoration(
+                        color: style.backgroundColor,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(style.icon, color: style.iconColor, size: 28),
+                    ),
+                    const SizedBox(width: ParentUiSpacing.md),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            notification.title,
+                            style: ParentUiTextStyles.heading.copyWith(
+                              fontSize: 22,
+                            ),
+                          ),
+                          const SizedBox(height: ParentUiSpacing.xs),
+                          Text(
+                            notification.message,
+                            style: ParentUiTextStyles.body.copyWith(
+                              color: const Color(0xFF334155),
+                              height: 1.35,
+                            ),
+                          ),
+                          const SizedBox(height: ParentUiSpacing.sm),
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.access_time_rounded,
+                                color: ParentUiColors.textSecondary,
+                                size: 18,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                notification.time,
+                                style: ParentUiTextStyles.caption.copyWith(
+                                  color: ParentUiColors.textSecondary,
+                                ),
+                              ),
+                              const Spacer(),
+                              if (isUnread)
+                                Text(
+                                  'Tap to view',
+                                  style: ParentUiTextStyles.caption.copyWith(
+                                    color: ParentUiColors.darkOrange,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                if (isUnread)
+                  const Positioned(
+                    right: 2,
+                    top: 2,
+                    child: CircleAvatar(
+                      radius: 6,
+                      backgroundColor: ParentUiColors.orange,
+                    ),
+                  ),
+              ],
             ),
-        ],
+          ),
+        ),
       ),
     );
-  }
-
-  _NotificationStyle _notificationStyle(ParentAlertType type) {
-    switch (type) {
-      case ParentAlertType.boarded:
-      case ParentAlertType.dropped:
-        return const _NotificationStyle(
-          icon: Icons.check_circle_outline_rounded,
-          iconColor: Color(0xFF16A34A),
-          backgroundColor: Color(0xFFDCFCE7),
-        );
-      case ParentAlertType.delay:
-      case ParentAlertType.emergency:
-        return const _NotificationStyle(
-          icon: Icons.error_outline_rounded,
-          iconColor: ParentUiColors.orange,
-          backgroundColor: ParentUiColors.lightOrange,
-        );
-      case ParentAlertType.general:
-        return const _NotificationStyle(
-          icon: Icons.info_outline_rounded,
-          iconColor: Color(0xFF2563EB),
-          backgroundColor: Color(0xFFDBEAFE),
-        );
-    }
   }
 }
 
@@ -421,5 +415,126 @@ class _NotificationsErrorView extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+void _showNotificationDetailsDialog(
+  BuildContext context,
+  ParentNotificationEntity notification,
+) {
+  final style = _notificationDialogStyle(notification.type);
+
+  showDialog<void>(
+    context: context,
+    builder: (dialogContext) {
+      return AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        title: Row(
+          children: [
+            Container(
+              height: 46,
+              width: 46,
+              decoration: BoxDecoration(
+                color: style.backgroundColor,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(style.icon, color: style.iconColor),
+            ),
+            const SizedBox(width: ParentUiSpacing.sm),
+            Expanded(
+              child: Text(
+                notification.title,
+                style: ParentUiTextStyles.heading.copyWith(fontSize: 21),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              notification.message,
+              style: ParentUiTextStyles.body.copyWith(height: 1.4),
+            ),
+            const SizedBox(height: ParentUiSpacing.md),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(ParentUiSpacing.md),
+              decoration: BoxDecoration(
+                color: ParentUiColors.lightOrange,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.access_time_rounded,
+                    color: ParentUiColors.darkOrange,
+                    size: 20,
+                  ),
+                  const SizedBox(width: ParentUiSpacing.xs),
+                  Expanded(
+                    child: Text(
+                      notification.time,
+                      style: ParentUiTextStyles.body.copyWith(
+                        color: ParentUiColors.darkOrange,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+            },
+            child: const Text('Close'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Notification marked as read')),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: ParentUiColors.orange,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Mark as read'),
+          ),
+        ],
+      );
+    },
+  );
+}
+
+_NotificationStyle _notificationDialogStyle(ParentAlertType type) {
+  switch (type) {
+    case ParentAlertType.boarded:
+    case ParentAlertType.dropped:
+      return const _NotificationStyle(
+        icon: Icons.check_circle_outline_rounded,
+        iconColor: Color(0xFF16A34A),
+        backgroundColor: Color(0xFFDCFCE7),
+      );
+    case ParentAlertType.delay:
+    case ParentAlertType.emergency:
+      return const _NotificationStyle(
+        icon: Icons.error_outline_rounded,
+        iconColor: ParentUiColors.orange,
+        backgroundColor: ParentUiColors.lightOrange,
+      );
+    case ParentAlertType.general:
+      return const _NotificationStyle(
+        icon: Icons.info_outline_rounded,
+        iconColor: Color(0xFF2563EB),
+        backgroundColor: Color(0xFFDBEAFE),
+      );
   }
 }
