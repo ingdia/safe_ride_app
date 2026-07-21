@@ -5,14 +5,15 @@ class ConnectivityService {
   final _connectivity = Connectivity();
 
   Stream<bool> get onlineStream => _connectivity.onConnectivityChanged
-      .map((results) => _isOnline(results));
+      .map(_isOnline);
 
   Future<bool> get isOnline async {
     final results = await _connectivity.checkConnectivity();
     return _isOnline(results);
   }
 
-  bool _isOnline(List<ConnectivityResult> results) => isOnlineFromResults(results);
+  bool _isOnline(List<ConnectivityResult> results) =>
+      results.any((r) => r != ConnectivityResult.none);
 
   /// Exposed for testing — maps a result list to a boolean online status.
   bool isOnlineFromResults(List<ConnectivityResult> results) =>

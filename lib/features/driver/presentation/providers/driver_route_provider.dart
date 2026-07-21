@@ -2,13 +2,13 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../shared/providers/attendance_cache_provider.dart';
+import '../../../../shared/providers/connectivity_provider.dart';
 import '../../data/datasources/attendance_cache_service.dart';
 import '../../data/models/cached_attendance_record.dart';
 import '../../data/repositories/mock_driver_repository.dart';
 import '../../domain/models/student.dart';
 import '../../domain/repositories/driver_repository.dart';
-import '../../../../shared/providers/attendance_cache_provider.dart';
-import '../../../../shared/providers/connectivity_provider.dart';
 import 'driver_route_state.dart';
 
 final driverRouteProvider = AsyncNotifierProvider<DriverRouteNotifier, DriverRouteState>(
@@ -39,10 +39,10 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
       final students = await repository.fetchRouteStudents();
 
       final cached = cacheService.loadAll();
-      final merged = students.map((s) {
-        final record = cached[s.id];
-        if (record == null) return s;
-        return s.copyWith(
+      final merged = students.map((student) {
+        final record = cached[student.id];
+        if (record == null) return student;
+        return student.copyWith(
           status: AttendanceStatus.values[record.statusIndex],
         );
       }).toList();
@@ -89,11 +89,11 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
       }
 
       final updatedStudents = currentState.students
-          .map((s) => s.id == updatedStudent.id ? updatedStudent : s)
+          .map((student) => student.id == updatedStudent.id ? updatedStudent : student)
           .toList();
 
       final boardedCount = updatedStudents
-          .where((s) => s.status == AttendanceStatus.boarded)
+          .where((student) => student.status == AttendanceStatus.boarded)
           .length;
       final progress = updatedStudents.isEmpty
           ? 0.0
@@ -110,7 +110,10 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
         ),
       );
     } catch (error) {
-      state = AsyncError(DriverRouteError(message: error.toString()), StackTrace.current);
+      state = AsyncError(
+        DriverRouteError(message: error.toString()),
+        StackTrace.current,
+      );
     }
   }
 }

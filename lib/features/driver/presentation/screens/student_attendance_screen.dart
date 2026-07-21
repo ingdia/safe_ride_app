@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../domain/models/student.dart';
-import '../bloc/driver_route_bloc.dart';
-import '../bloc/driver_route_event.dart';
-import '../bloc/driver_route_state.dart';
+import '../providers/driver_route_provider.dart';
+import '../providers/driver_route_state.dart';
 
 /// Driver's "Student Attendance List" screen.
 ///
@@ -19,42 +18,42 @@ import '../bloc/driver_route_state.dart';
 /// Task 2 (feature/driver-bloc) will move this to `DriverRouteBloc` so
 /// that marking a student triggers the parent notification described in
 /// the user flow.
-class StudentAttendanceScreen extends StatelessWidget {
+class StudentAttendanceScreen extends ConsumerWidget {
   const StudentAttendanceScreen({super.key});
 
-  void _cycleStatus(BuildContext context, Student student) {
+  void _cycleStatus(WidgetRef ref, Student student) {
     final next = switch (student.status) {
       AttendanceStatus.notBoarded => AttendanceStatus.boarded,
       AttendanceStatus.boarded => AttendanceStatus.absent,
       AttendanceStatus.absent => AttendanceStatus.notBoarded,
     };
 
-    context.read<DriverRouteBloc>().add(
-          UpdateStudentAttendanceStatus(
-            studentId: student.id,
-            status: next,
-          ),
-        );
+    ref.read(driverRouteProvider.notifier).updateStudentAttendanceStatus(
+      studentId: student.id,
+      status: next,
+    );
   }
 
   int _countFor(List<Student> students, AttendanceStatus status) =>
       students.where((s) => s.status == status).length;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(driverRouteProvider);
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
-        child: BlocBuilder<DriverRouteBloc, DriverRouteState>(
-          builder: (context, state) {
-            if (state is DriverRouteLoading || state is DriverRouteInitial) {
+        child: state.when(
+          data: (routeState) {
+            if (routeState is DriverRouteLoading || routeState is DriverRouteInitial) {
               return const Center(child: CircularProgressIndicator());
             }
 
-            if (state is DriverRouteError) {
+            if (routeState is DriverRouteError) {
               return Center(
                 child: Text(
-                  'Unable to load attendance: ${state.message}',
+                  'Unable to load attendance: ${routeState.message}',
                   textAlign: TextAlign.center,
                   style: AppTextStyles.bodyMedium.copyWith(
                     color: AppColors.textSecondary,
@@ -63,7 +62,7 @@ class StudentAttendanceScreen extends StatelessWidget {
               );
             }
 
-            final students = (state as DriverRouteLoaded).students;
+            final students = (routeState as DriverRouteLoaded).students;
 
             // Group students by stop, preserving first-seen order.
             final stopOrder = <String>[];
@@ -92,7 +91,7 @@ class StudentAttendanceScreen extends StatelessWidget {
                           final student = byStop[stopName]![index];
                           return _StudentListItem(
                             student: student,
-                            onTap: () => _cycleStatus(context, student),
+                            onTap: () => _cycleStatus(ref, student),
                           );
                         },
                         childCount: byStop[stopName]!.length,
@@ -106,6 +105,16 @@ class StudentAttendanceScreen extends StatelessWidget {
               ],
             );
           },
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (error, stack) => Center(
+            child: Text(
+              'Unable to load attendance: $error',
+              textAlign: TextAlign.center,
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
         ),
       ),
     );
