@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/entities/parent_notification_entity.dart';
-import '../providers/parent_data_providers.dart';
+import '../providers/parent_notification_center_provider.dart';
 import '../widgets/parent_ui_constants.dart';
 
 class ParentNotificationsScreen extends ConsumerWidget {
@@ -10,34 +10,8 @@ class ParentNotificationsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final notificationsState = ref.watch(parentNotificationsProvider);
-
-    return notificationsState.when(
-      loading: () => const _NotificationsLoadingView(),
-      error: (error, stackTrace) {
-        return _NotificationsErrorView(
-          onRetry: () {
-            ref.invalidate(parentNotificationsProvider);
-          },
-        );
-      },
-      data: (notifications) {
-        return _NotificationsContent(notifications: notifications);
-      },
-    );
-  }
-}
-
-class _NotificationsContent extends StatelessWidget {
-  const _NotificationsContent({required this.notifications});
-
-  final List<ParentNotificationEntity> notifications;
-
-  @override
-  Widget build(BuildContext context) {
-    final unreadCount = notifications
-        .where((notification) => !notification.isRead)
-        .length;
+    final notificationState = ref.watch(parentNotificationCenterProvider);
+    final controller = ref.read(parentNotificationCenterProvider.notifier);
 
     return Scaffold(
       backgroundColor: ParentUiColors.background,
@@ -48,8 +22,10 @@ class _NotificationsContent extends StatelessWidget {
             child: Column(
               children: [
                 _NotificationsHeader(
-                  totalCount: notifications.length,
-                  unreadCount: unreadCount,
+                  totalCount: notificationState.totalCount,
+                  unreadCount: notificationState.unreadCount,
+                  selectedFilter: notificationState.selectedFilter,
+                  onFilterChanged: controller.selectFilter,
                 ),
                 Expanded(
                   child: SingleChildScrollView(
@@ -61,24 +37,47 @@ class _NotificationsContent extends StatelessWidget {
                     ),
                     child: Column(
                       children: [
-                        const _MarkAllAsReadButton(),
+                        _MarkAllAsReadButton(
+                          onPressed: () {
+                            controller.markAllAsRead();
+
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'All notifications marked as read',
+                                ),
+                              ),
+                            );
+                          },
+                        ),
                         const SizedBox(height: ParentUiSpacing.lg),
-                        ...notifications.map((notification) {
-                          return Padding(
-                            padding: const EdgeInsets.only(
-                              bottom: ParentUiSpacing.md,
-                            ),
-                            child: _NotificationCard(
-                              notification: notification,
-                              onTap: () {
-                                _showNotificationDetailsDialog(
-                                  context,
-                                  notification,
-                                );
-                              },
-                            ),
-                          );
-                        }),
+                        if (notificationState.visibleNotifications.isEmpty)
+                          const _EmptyNotificationCenterCard()
+                        else
+                          ...notificationState.visibleNotifications.map((
+                            notification,
+                          ) {
+                            return Padding(
+                              padding: const EdgeInsets.only(
+                                bottom: ParentUiSpacing.md,
+                              ),
+                              child: _NotificationCard(
+                                notification: notification,
+                                onTap: () {
+                                  _showNotificationDetailsDialog(
+                                    context,
+                                    notification,
+                                    onMarkAsRead: () {
+                                      controller.markAsRead(notification.id);
+                                    },
+                                  );
+                                },
+                                onMarkRead: () {
+                                  controller.markAsRead(notification.id);
+                                },
+                              ),
+                            );
+                          }),
                       ],
                     ),
                   ),
@@ -96,10 +95,14 @@ class _NotificationsHeader extends StatelessWidget {
   const _NotificationsHeader({
     required this.totalCount,
     required this.unreadCount,
+    required this.selectedFilter,
+    required this.onFilterChanged,
   });
 
   final int totalCount;
   final int unreadCount;
+  final ParentNotificationFilter selectedFilter;
+  final ValueChanged<ParentNotificationFilter> onFilterChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -167,14 +170,20 @@ class _NotificationsHeader extends StatelessWidget {
               Expanded(
                 child: _FilterChipButton(
                   label: 'All ($totalCount)',
-                  isSelected: true,
+                  isSelected: selectedFilter == ParentNotificationFilter.all,
+                  onTap: () {
+                    onFilterChanged(ParentNotificationFilter.all);
+                  },
                 ),
               ),
               const SizedBox(width: ParentUiSpacing.sm),
               Expanded(
                 child: _FilterChipButton(
                   label: 'Unread ($unreadCount)',
-                  isSelected: false,
+                  isSelected: selectedFilter == ParentNotificationFilter.unread,
+                  onTap: () {
+                    onFilterChanged(ParentNotificationFilter.unread);
+                  },
                 ),
               ),
             ],
@@ -186,26 +195,36 @@ class _NotificationsHeader extends StatelessWidget {
 }
 
 class _FilterChipButton extends StatelessWidget {
-  const _FilterChipButton({required this.label, required this.isSelected});
+  const _FilterChipButton({
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+  });
 
   final String label;
   final bool isSelected;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 56,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.22),
+    return Material(
+      color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.22),
+      borderRadius: BorderRadius.circular(22),
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(22),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: isSelected ? ParentUiColors.darkOrange : Colors.white,
-          fontSize: 18,
-          fontWeight: FontWeight.w900,
+        child: SizedBox(
+          height: 56,
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? ParentUiColors.darkOrange : Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -213,7 +232,9 @@ class _FilterChipButton extends StatelessWidget {
 }
 
 class _MarkAllAsReadButton extends StatelessWidget {
-  const _MarkAllAsReadButton();
+  const _MarkAllAsReadButton({required this.onPressed});
+
+  final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -221,7 +242,7 @@ class _MarkAllAsReadButton extends StatelessWidget {
       height: 64,
       width: double.infinity,
       child: OutlinedButton(
-        onPressed: () {},
+        onPressed: onPressed,
         style: OutlinedButton.styleFrom(
           side: const BorderSide(color: ParentUiColors.orange, width: 2),
           shape: RoundedRectangleBorder(
@@ -237,14 +258,19 @@ class _MarkAllAsReadButton extends StatelessWidget {
 }
 
 class _NotificationCard extends StatelessWidget {
-  const _NotificationCard({required this.notification, required this.onTap});
+  const _NotificationCard({
+    required this.notification,
+    required this.onTap,
+    required this.onMarkRead,
+  });
 
   final ParentNotificationEntity notification;
   final VoidCallback onTap;
+  final VoidCallback onMarkRead;
 
   @override
   Widget build(BuildContext context) {
-    final style = _notificationDialogStyle(notification.type);
+    final style = _notificationStyle(notification.type);
     final isUnread = !notification.isRead;
 
     return Material(
@@ -313,20 +339,22 @@ class _NotificationCard extends StatelessWidget {
                                 size: 18,
                               ),
                               const SizedBox(width: 6),
-                              Text(
-                                notification.time,
-                                style: ParentUiTextStyles.caption.copyWith(
-                                  color: ParentUiColors.textSecondary,
+                              Expanded(
+                                child: Text(
+                                  notification.time,
+                                  style: ParentUiTextStyles.caption.copyWith(
+                                    color: ParentUiColors.textSecondary,
+                                  ),
                                 ),
                               ),
-                              const Spacer(),
                               if (isUnread)
-                                Text(
-                                  'Tap to view',
-                                  style: ParentUiTextStyles.caption.copyWith(
-                                    color: ParentUiColors.darkOrange,
-                                    fontWeight: FontWeight.w900,
+                                TextButton(
+                                  onPressed: onMarkRead,
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: ParentUiColors.darkOrange,
+                                    visualDensity: VisualDensity.compact,
                                   ),
+                                  child: const Text('Mark read'),
                                 ),
                             ],
                           ),
@@ -353,66 +381,37 @@ class _NotificationCard extends StatelessWidget {
   }
 }
 
-class _NotificationStyle {
-  const _NotificationStyle({
-    required this.icon,
-    required this.iconColor,
-    required this.backgroundColor,
-  });
-
-  final IconData icon;
-  final Color iconColor;
-  final Color backgroundColor;
-}
-
-class _NotificationsLoadingView extends StatelessWidget {
-  const _NotificationsLoadingView();
+class _EmptyNotificationCenterCard extends StatelessWidget {
+  const _EmptyNotificationCenterCard();
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      backgroundColor: ParentUiColors.background,
-      body: Center(
-        child: CircularProgressIndicator(color: ParentUiColors.orange),
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(ParentUiSpacing.lg),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: ParentUiColors.border),
       ),
-    );
-  }
-}
-
-class _NotificationsErrorView extends StatelessWidget {
-  const _NotificationsErrorView({required this.onRetry});
-
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: ParentUiColors.background,
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(ParentUiSpacing.lg),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(
-                Icons.error_outline_rounded,
-                color: ParentUiColors.danger,
-                size: 42,
-              ),
-              const SizedBox(height: ParentUiSpacing.md),
-              Text(
-                'Failed to load notifications.',
-                textAlign: TextAlign.center,
-                style: ParentUiTextStyles.body,
-              ),
-              const SizedBox(height: ParentUiSpacing.md),
-              ElevatedButton(
-                onPressed: onRetry,
-                child: const Text('Try again'),
-              ),
-            ],
+      child: Column(
+        children: [
+          const Icon(
+            Icons.notifications_none_rounded,
+            color: ParentUiColors.orange,
+            size: 42,
           ),
-        ),
+          const SizedBox(height: ParentUiSpacing.md),
+          Text('No notifications here', style: ParentUiTextStyles.heading),
+          const SizedBox(height: ParentUiSpacing.xs),
+          Text(
+            'Your selected notification filter has no alerts.',
+            textAlign: TextAlign.center,
+            style: ParentUiTextStyles.caption.copyWith(
+              color: ParentUiColors.textSecondary,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -420,9 +419,10 @@ class _NotificationsErrorView extends StatelessWidget {
 
 void _showNotificationDetailsDialog(
   BuildContext context,
-  ParentNotificationEntity notification,
-) {
-  final style = _notificationDialogStyle(notification.type);
+  ParentNotificationEntity notification, {
+  required VoidCallback onMarkAsRead,
+}) {
+  final style = _notificationStyle(notification.type);
 
   showDialog<void>(
     context: context,
@@ -494,27 +494,29 @@ void _showNotificationDetailsDialog(
             },
             child: const Text('Close'),
           ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(dialogContext).pop();
+          if (!notification.isRead)
+            ElevatedButton(
+              onPressed: () {
+                onMarkAsRead();
+                Navigator.of(dialogContext).pop();
 
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Notification marked as read')),
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: ParentUiColors.orange,
-              foregroundColor: Colors.white,
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Notification marked as read')),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: ParentUiColors.orange,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Mark as read'),
             ),
-            child: const Text('Mark as read'),
-          ),
         ],
       );
     },
   );
 }
 
-_NotificationStyle _notificationDialogStyle(ParentAlertType type) {
+_NotificationStyle _notificationStyle(ParentAlertType type) {
   switch (type) {
     case ParentAlertType.boarded:
     case ParentAlertType.dropped:
@@ -537,4 +539,16 @@ _NotificationStyle _notificationDialogStyle(ParentAlertType type) {
         backgroundColor: Color(0xFFDBEAFE),
       );
   }
+}
+
+class _NotificationStyle {
+  const _NotificationStyle({
+    required this.icon,
+    required this.iconColor,
+    required this.backgroundColor,
+  });
+
+  final IconData icon;
+  final Color iconColor;
+  final Color backgroundColor;
 }
