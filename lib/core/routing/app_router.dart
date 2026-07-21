@@ -20,7 +20,7 @@ class AppRouter {
       case UserRole.driver:
         return DriverRoutes.dashboard;
       case UserRole.admin:
-        return AdminRoutes.dashboard;
+        return AdminRoutes.shell;
     }
   }
 

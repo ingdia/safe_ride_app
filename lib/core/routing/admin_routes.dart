@@ -6,10 +6,12 @@ class AdminRoutes {
   const AdminRoutes._();
 
   static const String dashboard = '/admin/dashboard';
+  static const String shell = '/admin/shell';
 
   static Route<dynamic>? onGenerateRoute(RouteSettings settings) {
     switch (settings.name) {
       case dashboard:
+      case shell:
         return MaterialPageRoute(
           builder: (_) => const AdminNavigationShell(),
           settings: settings,

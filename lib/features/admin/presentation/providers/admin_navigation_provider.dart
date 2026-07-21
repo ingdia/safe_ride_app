@@ -1,6 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-enum AdminTab { home, map, alerts, profile }
+enum AdminTab {
+  dashboard,
+  buses,
+  users,
+  emergency,
+  settings,
+}
 
 final adminNavigationProvider =
     NotifierProvider<AdminNavigationController, AdminTab>(
@@ -10,7 +16,7 @@ final adminNavigationProvider =
 class AdminNavigationController extends Notifier<AdminTab> {
   @override
   AdminTab build() {
-    return AdminTab.home;
+    return AdminTab.dashboard;
   }
 
   void selectTab(AdminTab tab) {
@@ -21,27 +27,31 @@ class AdminNavigationController extends Notifier<AdminTab> {
 extension AdminTabExtension on AdminTab {
   int get index {
     switch (this) {
-      case AdminTab.home:
+      case AdminTab.dashboard:
         return 0;
-      case AdminTab.map:
+      case AdminTab.buses:
         return 1;
-      case AdminTab.alerts:
+      case AdminTab.users:
         return 2;
-      case AdminTab.profile:
+      case AdminTab.emergency:
         return 3;
+      case AdminTab.settings:
+        return 4;
     }
   }
 
   String get label {
     switch (this) {
-      case AdminTab.home:
-        return 'Home';
-      case AdminTab.map:
-        return 'Map';
-      case AdminTab.alerts:
-        return 'Alerts';
-      case AdminTab.profile:
-        return 'Profile';
+      case AdminTab.dashboard:
+        return 'Dashboard';
+      case AdminTab.buses:
+        return 'Buses';
+      case AdminTab.users:
+        return 'Users';
+      case AdminTab.emergency:
+        return 'Emergency';
+      case AdminTab.settings:
+        return 'Settings';
     }
   }
 }
@@ -49,13 +59,15 @@ extension AdminTabExtension on AdminTab {
 AdminTab adminTabFromIndex(int index) {
   switch (index) {
     case 1:
-      return AdminTab.map;
+      return AdminTab.buses;
     case 2:
-      return AdminTab.alerts;
+      return AdminTab.users;
     case 3:
-      return AdminTab.profile;
+      return AdminTab.emergency;
+    case 4:
+      return AdminTab.settings;
     case 0:
     default:
-      return AdminTab.home;
+      return AdminTab.dashboard;
   }
 }

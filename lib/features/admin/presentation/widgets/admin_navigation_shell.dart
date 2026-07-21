@@ -4,17 +4,19 @@ import '../providers/admin_navigation_provider.dart';
 import 'admin_ui_constants.dart';
 
 class AdminNavigationShell extends ConsumerWidget {
-  final Widget homeChild;
-  final Widget mapChild;
-  final Widget alertsChild;
-  final Widget profileChild;
+  final Widget dashboardChild;
+  final Widget busesChild;
+  final Widget usersChild;
+  final Widget emergencyChild;
+  final Widget settingsChild;
 
   const AdminNavigationShell({
     super.key,
-    required this.homeChild,
-    required this.mapChild,
-    required this.alertsChild,
-    required this.profileChild,
+    required this.dashboardChild,
+    required this.busesChild,
+    required this.usersChild,
+    required this.emergencyChild,
+    required this.settingsChild,
   });
 
   @override
@@ -22,10 +24,11 @@ class AdminNavigationShell extends ConsumerWidget {
     final currentTab = ref.watch(adminNavigationProvider);
 
     final children = <AdminTab, Widget>{
-      AdminTab.home: homeChild,
-      AdminTab.map: mapChild,
-      AdminTab.alerts: alertsChild,
-      AdminTab.profile: profileChild,
+      AdminTab.dashboard: dashboardChild,
+      AdminTab.buses: busesChild,
+      AdminTab.users: usersChild,
+      AdminTab.emergency: emergencyChild,
+      AdminTab.settings: settingsChild,
     };
 
     return Scaffold(
@@ -70,14 +73,16 @@ class _NavBarItem extends StatelessWidget {
 
   IconData get _icon {
     switch (tab) {
-      case AdminTab.home:
-        return Icons.home_rounded;
-      case AdminTab.map:
-        return Icons.map_outlined;
-      case AdminTab.alerts:
-        return Icons.notifications_none_rounded;
-      case AdminTab.profile:
-        return Icons.person_outline_rounded;
+      case AdminTab.dashboard:
+        return Icons.dashboard_rounded;
+      case AdminTab.buses:
+        return Icons.directions_bus_rounded;
+      case AdminTab.users:
+        return Icons.people_rounded;
+      case AdminTab.emergency:
+        return Icons.emergency_rounded;
+      case AdminTab.settings:
+        return Icons.settings_rounded;
     }
   }
 
