@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-enum ParentTab { home, tracking, notifications }
+enum ParentTab { home, tracking, notifications, profile }
 
 final parentNavigationProvider =
     NotifierProvider<ParentNavigationController, ParentTab>(
@@ -27,6 +27,8 @@ extension ParentTabExtension on ParentTab {
         return 1;
       case ParentTab.notifications:
         return 2;
+      case ParentTab.profile:
+        return 3;
     }
   }
 
@@ -38,6 +40,8 @@ extension ParentTabExtension on ParentTab {
         return 'Tracking';
       case ParentTab.notifications:
         return 'Alerts';
+      case ParentTab.profile:
+        return 'Profile';
     }
   }
 }
@@ -48,6 +52,8 @@ ParentTab parentTabFromIndex(int index) {
       return ParentTab.tracking;
     case 2:
       return ParentTab.notifications;
+    case 3:
+      return ParentTab.profile;
     case 0:
     default:
       return ParentTab.home;
