@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../shared/providers/attendance_cache_provider.dart';
 import '../../../../shared/providers/connectivity_provider.dart';
+import '../../data/datasources/attendance_cache_service.dart';
 import '../../data/models/cached_attendance_record.dart';
 import '../../data/repositories/mock_driver_repository.dart';
 import '../../domain/models/student.dart';
@@ -22,10 +23,6 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
   Future<DriverRouteState> _loadRoute() async {
     final repository = MockDriverRepository();
     final cacheService = ref.read(attendanceCacheProvider);
-    ref.watch(connectivityProvider).maybeWhen(
-      data: (value) => value,
-      orElse: () => true,
-    );
 
     state = const AsyncLoading<DriverRouteState>();
     try {
@@ -41,7 +38,27 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
         );
       }).toList();
 
-      return DriverRouteLoaded(stops: stops, students: merged);
+      final syncedStudents = await _syncPendingCachedAttendance(
+        repository: repository,
+        students: merged,
+        cacheService: cacheService,
+      );
+
+      final boardedCount = syncedStudents
+          .where((student) => student.status == AttendanceStatus.boarded)
+          .length;
+      final progress = syncedStudents.isEmpty
+          ? 0.0
+          : boardedCount / syncedStudents.length;
+
+      return DriverRouteLoaded(
+        stops: stops,
+        students: syncedStudents,
+        routeProgress: progress,
+        gpsStatus: progress >= 1.0
+            ? 'All students marked'
+            : 'Route progress ${(progress * 100).round()}%',
+      );
     } catch (error) {
       return DriverRouteError(message: error.toString());
     }
@@ -116,5 +133,40 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
         StackTrace.current,
       );
     }
+  }
+
+  Future<List<Student>> _syncPendingCachedAttendance({
+    required MockDriverRepository repository,
+    required List<Student> students,
+    required AttendanceCacheService cacheService,
+  }) async {
+    final isOnline = ref.watch(connectivityProvider).maybeWhen(
+      data: (value) => value,
+      orElse: () => true,
+    );
+    if (!isOnline) return students;
+
+    final cached = cacheService.loadAll();
+    if (cached.isEmpty) return students;
+
+    final syncedStudents = List<Student>.from(students);
+    for (final record in cached.values) {
+      final status = AttendanceStatus.values[record.statusIndex];
+      try {
+        final updatedStudent = await repository.updateStudentAttendanceStatus(
+          record.studentId,
+          status,
+        );
+        final index = syncedStudents.indexWhere((student) => student.id == updatedStudent.id);
+        if (index != -1) {
+          syncedStudents[index] = updatedStudent;
+        }
+        await cacheService.deleteRecord(record.studentId);
+      } catch (_) {
+        continue;
+      }
+    }
+
+    return syncedStudents;
   }
 }
