@@ -24,7 +24,6 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
     final repository = MockDriverRepository();
     final cacheService = ref.read(attendanceCacheProvider);
 
-    state = const AsyncLoading<DriverRouteState>();
     try {
       final stops = await repository.fetchRouteStops();
       final students = await repository.fetchRouteStudents();
@@ -65,7 +64,6 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
   }
 
   Future<void> loadRoute() async {
-    state = const AsyncLoading<DriverRouteState>();
     state = await AsyncValue.guard(() => _loadRoute());
   }
 
@@ -78,7 +76,7 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
 
     final repository = MockDriverRepository();
     final cacheService = ref.read(attendanceCacheProvider);
-    final isOnline = ref.watch(connectivityProvider).maybeWhen(
+    final isOnline = ref.read(connectivityProvider).maybeWhen(
       data: (value) => value,
       orElse: () => true,
     );
@@ -140,7 +138,7 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
     required List<Student> students,
     required AttendanceCacheService cacheService,
   }) async {
-    final isOnline = ref.watch(connectivityProvider).maybeWhen(
+    final isOnline = ref.read(connectivityProvider).maybeWhen(
       data: (value) => value,
       orElse: () => true,
     );

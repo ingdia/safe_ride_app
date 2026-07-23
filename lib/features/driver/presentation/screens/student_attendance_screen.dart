@@ -11,16 +11,10 @@ import '../providers/driver_route_state.dart';
 class StudentAttendanceScreen extends ConsumerWidget {
   const StudentAttendanceScreen({super.key});
 
-  void _toggleStatus(WidgetRef ref, Student student) {
-    final next = switch (student.status) {
-      AttendanceStatus.notBoarded => AttendanceStatus.boarded,
-      AttendanceStatus.boarded => AttendanceStatus.notBoarded,
-      AttendanceStatus.absent => AttendanceStatus.notBoarded,
-    };
-
+  void _updateStatus(WidgetRef ref, Student student, AttendanceStatus status) {
     ref.read(driverRouteProvider.notifier).updateStudentAttendanceStatus(
       studentId: student.id,
-      status: next,
+      status: status,
     );
   }
 
@@ -71,7 +65,9 @@ class StudentAttendanceScreen extends ConsumerWidget {
                     children: [
                       Expanded(child: _SummaryPill(label: 'Waiting', count: _countFor(students, AttendanceStatus.notBoarded), color: AppColors.warning)),
                       const SizedBox(width: AppSpacing.sm),
-                      Expanded(child: _SummaryPill(label: 'On Board', count: _countFor(students, AttendanceStatus.boarded), color: AppColors.success)),
+                      Expanded(child: _SummaryPill(label: 'Boarded', count: _countFor(students, AttendanceStatus.boarded), color: AppColors.success)),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(child: _SummaryPill(label: 'Dropped Off', count: _countFor(students, AttendanceStatus.absent), color: AppColors.textSecondary)),
                     ],
                   ),
                 ),
@@ -80,7 +76,10 @@ class StudentAttendanceScreen extends ConsumerWidget {
                       _buildStopHeader(stopName),
                       ...byStop[stopName]!.map((student) => Padding(
                             padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                            child: _StudentListItem(student: student, onTap: () => _toggleStatus(ref, student)),
+                            child: _StudentListItem(
+                              student: student,
+                              onSetStatus: (status) => _updateStatus(ref, student, status),
+                            ),
                           )),
                     ]),
               ],
@@ -146,14 +145,16 @@ class _SummaryPill extends StatelessWidget {
 }
 
 class _StudentListItem extends StatelessWidget {
-  const _StudentListItem({required this.student, required this.onTap});
+  const _StudentListItem({
+    required this.student,
+    required this.onSetStatus,
+  });
 
   final Student student;
-  final VoidCallback onTap;
+  final ValueChanged<AttendanceStatus> onSetStatus;
 
   @override
   Widget build(BuildContext context) {
-    final isBoarded = student.status == AttendanceStatus.boarded;
     return Container(
       margin: const EdgeInsets.only(bottom: AppSpacing.sm),
       decoration: BoxDecoration(
@@ -182,35 +183,82 @@ class _StudentListItem extends StatelessWidget {
               ),
             ),
             const SizedBox(width: AppSpacing.sm),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
-              decoration: BoxDecoration(
-                color: isBoarded ? AppColors.success.withValues(alpha: 0.12) : AppColors.warning.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-              ),
-              child: Text(isBoarded ? 'On Board' : 'Waiting', style: AppTextStyles.bodySmall.copyWith(color: isBoarded ? AppColors.success : AppColors.warning, fontWeight: FontWeight.w700)),
-            ),
-            const SizedBox(width: AppSpacing.sm),
             SizedBox(
-              height: AppSpacing.tapTargetMin,
-              child: ElevatedButton(
-                onPressed: onTap,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppSpacing.radiusMd)),
-                ),
-                child: Text(isBoarded ? 'Mark as Waiting' : 'Check In'),
+              width: 200,
+              child: Wrap(
+                alignment: WrapAlignment.end,
+                spacing: AppSpacing.xs,
+                runSpacing: AppSpacing.xs,
+                children: [
+                  _StatusToggleButton(
+                    label: 'Boarded',
+                    icon: Icons.check_circle_rounded,
+                    color: AppColors.success,
+                    selected: student.status == AttendanceStatus.boarded,
+                    onTap: () => onSetStatus(AttendanceStatus.boarded),
+                  ),
+                  _StatusToggleButton(
+                    label: 'Waiting',
+                    icon: Icons.pending_outlined,
+                    color: AppColors.warning,
+                    selected: student.status == AttendanceStatus.notBoarded,
+                    onTap: () => onSetStatus(AttendanceStatus.notBoarded),
+                  ),
+                  _StatusToggleButton(
+                    label: 'Dropped Off',
+                    icon: Icons.keyboard_double_arrow_right_rounded,
+                    color: AppColors.textSecondary,
+                    selected: student.status == AttendanceStatus.absent,
+                    onTap: () => onSetStatus(AttendanceStatus.absent),
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(width: AppSpacing.sm),
-            IconButton(
-              onPressed: () {},
-              icon: const Icon(Icons.call_outlined, color: AppColors.primary),
-              tooltip: 'Call student',
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StatusToggleButton extends StatelessWidget {
+  const _StatusToggleButton({
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final Color color;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.xs),
+          decoration: BoxDecoration(
+            color: selected ? color.withValues(alpha: 0.12) : AppColors.background,
+            borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+            border: Border.all(color: selected ? color : AppColors.border),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: selected ? color : AppColors.textSecondary, size: 16),
+              const SizedBox(width: AppSpacing.xs),
+              Text(label, style: AppTextStyles.bodySmall.copyWith(color: selected ? color : AppColors.textSecondary, fontWeight: FontWeight.w700)),
+            ],
+          ),
         ),
       ),
     );

@@ -6,6 +6,7 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../domain/models/route_stop.dart';
 import '../../domain/models/student.dart';
+import '../providers/driver_navigation_provider.dart';
 import '../providers/driver_profile_provider.dart';
 import '../providers/driver_route_provider.dart';
 import '../providers/driver_route_state.dart';
@@ -30,17 +31,23 @@ class DriverDashboardScreen extends ConsumerWidget {
             final loaded = state;
             final studentCount = loaded.students.length;
             final stopCount = loaded.stops.length;
+            final completedStops = loaded.stops.where((stop) => stop.status == RouteStopStatus.completed).length;
             final nextStop = loaded.stops.firstWhere(
               (stop) => stop.status != RouteStopStatus.completed,
               orElse: () => loaded.stops.first,
             );
             final boardedCount = loaded.students.where((student) => student.status == AttendanceStatus.boarded).length;
             final remainingCount = studentCount - boardedCount;
+            final todayLabel = _todayLabel();
 
             return ListView(
               padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.md, AppSpacing.md, AppSpacing.xxl),
               children: [
-                _HeaderCard(profile: profile),
+                _HeaderCard(
+                  profile: profile,
+                  routeName: profile.route,
+                  todayLabel: todayLabel,
+                ),
                 const SizedBox(height: AppSpacing.md),
                 _SectionCard(
                   title: 'Active route',
@@ -86,8 +93,26 @@ class DriverDashboardScreen extends ConsumerWidget {
                     children: [
                       Expanded(child: _MetricPill(label: 'Stops', value: '$stopCount')),
                       const SizedBox(width: AppSpacing.sm),
+                      Expanded(child: _MetricPill(label: 'Completed', value: '$completedStops')),
+                      const SizedBox(width: AppSpacing.sm),
                       Expanded(child: _MetricPill(label: 'Remaining', value: '$remainingCount')),
                     ],
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                SizedBox(
+                  height: AppSpacing.tapTargetMin + 8,
+                  child: ElevatedButton.icon(
+                    onPressed: () => ref.read(driverNavigationProvider.notifier).selectTab(1),
+                    icon: const Icon(Icons.navigation_rounded),
+                    label: const Text('Start Route / Continue Route'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(height: AppSpacing.md),
@@ -97,9 +122,27 @@ class DriverDashboardScreen extends ConsumerWidget {
                   spacing: AppSpacing.sm,
                   runSpacing: AppSpacing.sm,
                   children: [
-                    _ActionChip(label: 'View roster', icon: Icons.groups_outlined),
-                    _ActionChip(label: 'Open route', icon: Icons.route_outlined),
-                    _ActionChip(label: 'Offline sync', icon: Icons.cloud_off_outlined),
+                    _ActionChip(
+                      key: const ValueKey('driver_quick_action_view_roster'),
+                      label: 'View roster',
+                      icon: Icons.groups_outlined,
+                      onTap: () => ref.read(driverNavigationProvider.notifier).selectTab(2),
+                    ),
+                    _ActionChip(
+                      label: 'Today’s route',
+                      icon: Icons.route_outlined,
+                      onTap: () => ref.read(driverNavigationProvider.notifier).selectTab(1),
+                    ),
+                    _ActionChip(
+                      label: 'Trip history',
+                      icon: Icons.history_rounded,
+                      onTap: () => _showTripHistory(context),
+                    ),
+                    _ActionChip(
+                      label: 'Profile',
+                      icon: Icons.person_outline_rounded,
+                      onTap: () => ref.read(driverNavigationProvider.notifier).selectTab(5),
+                    ),
                   ],
                 ),
               ],
@@ -111,12 +154,74 @@ class DriverDashboardScreen extends ConsumerWidget {
       ),
     );
   }
+
+  void _showTripHistory(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppSpacing.radiusLg)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Trip history', style: AppTextStyles.headingSmall),
+                const SizedBox(height: AppSpacing.sm),
+                _HistoryLogTile(title: 'North Loop Route', subtitle: 'Mon 07:30 • On time • 4/5 marked'),
+                _HistoryLogTile(title: 'Central School Circle', subtitle: 'Fri 07:25 • Delayed 4 min • 3/4 marked'),
+                _HistoryLogTile(title: 'New Market Route', subtitle: 'Thu 07:35 • On time • 5/5 marked'),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+String _todayLabel() {
+  final now = DateTime.now();
+  const weekdays = <String>[
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+    'Sunday',
+  ];
+  const months = <String>[
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+
+  return '${weekdays[now.weekday - 1]}, ${months[now.month - 1]} ${now.day}';
 }
 
 class _HeaderCard extends StatelessWidget {
-  const _HeaderCard({required this.profile});
+  const _HeaderCard({
+    required this.profile,
+    required this.routeName,
+    required this.todayLabel,
+  });
 
   final DriverProfile profile;
+  final String routeName;
+  final String todayLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -149,9 +254,24 @@ class _HeaderCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Good morning, ${profile.name.split(' ').first}', style: AppTextStyles.headingSmall.copyWith(color: Colors.white)),
+                Text(
+                  'Good morning, ${profile.name.split(' ').first}',
+                  style: AppTextStyles.headingSmall.copyWith(color: Colors.white),
+                ),
                 const SizedBox(height: AppSpacing.xs),
-                Text(profile.route, style: AppTextStyles.bodyMedium.copyWith(color: Colors.white.withValues(alpha: 0.9))),
+                Text(
+                  todayLabel,
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: Colors.white.withValues(alpha: 0.9),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  routeName,
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: Colors.white.withValues(alpha: 0.9),
+                  ),
+                ),
               ],
             ),
           ),
@@ -224,26 +344,67 @@ class _MetricPill extends StatelessWidget {
 }
 
 class _ActionChip extends StatelessWidget {
-  const _ActionChip({required this.label, required this.icon});
+  const _ActionChip({
+    super.key,
+    required this.label,
+    required this.icon,
+    required this.onTap,
+  });
 
   final String label;
   final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: AppColors.primary, size: 20),
+              const SizedBox(width: AppSpacing.xs),
+              Text(label, style: AppTextStyles.bodyMedium),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HistoryLogTile extends StatelessWidget {
+  const _HistoryLogTile({required this.title, required this.subtitle});
+
+  final String title;
+  final String subtitle;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+      padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
         border: Border.all(color: AppColors.border),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: AppColors.primary, size: 20),
-          const SizedBox(width: AppSpacing.xs),
-          Text(label, style: AppTextStyles.bodyMedium),
+          Text(title, style: AppTextStyles.bodyMedium),
+          const SizedBox(height: AppSpacing.xs),
+          Text(subtitle, style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary)),
         ],
       ),
     );
