@@ -25,9 +25,9 @@ class AttendanceCacheService {
   }
 
   /// Returns all cached records, keyed by studentId.
-  Future<Map<String, CachedAttendanceRecord>> loadAll() async {
-    final box = await _ensureBox();
-    return Map.unmodifiable(box.toMap().cast<String, CachedAttendanceRecord>());
+  Map<String, CachedAttendanceRecord> loadAll() {
+    if (_box == null) return const {};
+    return Map.unmodifiable(_box!.toMap().cast<String, CachedAttendanceRecord>());
   }
 
   /// Removes the record for [studentId].
