@@ -3,11 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../shared/widgets/app_navigation_shell.dart';
 import '../providers/admin_navigation_provider.dart';
-import 'admin_dashboard_screen.dart';
-import 'admin_buses_screen.dart';
+import 'admin_home_screen.dart';
 import 'admin_emergency_screen.dart';
-import 'admin_users_screen.dart';
-import 'admin_settings_screen.dart';
+import 'admin_map_screen.dart';
+import 'admin_notifications_screen.dart';
+import 'admin_profile_screen.dart';
 
 // ---------------------------------------------------------------------------
 // Admin navigation shell — wraps admin screens with bottom nav bar
@@ -23,35 +23,35 @@ class AdminNavigationShell extends ConsumerWidget {
       label: 'Dashboard',
     ),
     AppNavItem(
-      icon: Icons.directions_bus_outlined,
-      activeIcon: Icons.directions_bus_rounded,
-      label: 'Buses',
-    ),
-    AppNavItem(
-      icon: Icons.people_outline_rounded,
-      activeIcon: Icons.people_rounded,
-      label: 'Users',
-    ),
-    AppNavItem(
       icon: Icons.emergency_outlined,
       activeIcon: Icons.emergency_rounded,
       label: 'Emergency',
     ),
     AppNavItem(
-      icon: Icons.settings_outlined,
-      activeIcon: Icons.settings_rounded,
-      label: 'Settings',
+      icon: Icons.map_outlined,
+      activeIcon: Icons.map_rounded,
+      label: 'Map',
+    ),
+    AppNavItem(
+      icon: Icons.notifications_none_rounded,
+      activeIcon: Icons.notifications_rounded,
+      label: 'Alerts',
+    ),
+    AppNavItem(
+      icon: Icons.person_outline_rounded,
+      activeIcon: Icons.person_rounded,
+      label: 'Profile',
     ),
   ];
 
   // IndexedStack preserves state of off-screen children.
   // If memory becomes an issue, consider lazy-loading screens.
   static const List<Widget> _screens = <Widget>[
-    AdminDashboardScreen(),
-    AdminBusesScreen(),
-    AdminUsersScreen(),
+    FleetOverviewScreen(),
     AdminEmergencyScreen(),
-    AdminSettingsScreen(),
+    LiveMapScreen(),
+    NotificationsScreen(),
+    ProfileScreen(),
   ];
 
   @override
