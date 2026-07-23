@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -65,6 +67,7 @@ class _SplashScreenState extends State<SplashScreen>
   late final Animation<double> _fade;
   late final Animation<double> _scale;
   bool _disposed = false;
+  Timer? _navigationTimer;
 
   @override
   void initState() {
@@ -80,7 +83,7 @@ class _SplashScreenState extends State<SplashScreen>
 
     _controller.forward();
 
-    Future.delayed(const Duration(milliseconds: 2400), _navigate);
+    _navigationTimer = Timer(const Duration(milliseconds: 2400), _navigate);
   }
 
   void _navigate() {
@@ -91,6 +94,7 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   void dispose() {
     _disposed = true;
+    _navigationTimer?.cancel();
     _controller.dispose();
     super.dispose();
   }

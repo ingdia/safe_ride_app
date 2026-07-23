@@ -11,7 +11,8 @@ class FakeAttendanceCacheService implements AttendanceCacheService {
   }
 
   @override
-  Map<String, CachedAttendanceRecord> loadAll() => Map.unmodifiable(_store);
+  Map<String, CachedAttendanceRecord> loadAll() =>
+      Map.unmodifiable(_store);
 
   @override
   Future<void> deleteRecord(String studentId) async {

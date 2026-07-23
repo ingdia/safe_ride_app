@@ -1,12 +1,14 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-
 import 'package:safe_ride_app/main.dart';
-import 'package:safe_ride_app/features/driver/data/repositories/mock_driver_repository.dart';
 import 'package:safe_ride_app/features/driver/domain/models/student.dart';
-import 'package:safe_ride_app/features/driver/presentation/bloc/driver_route_bloc.dart';
-import 'package:safe_ride_app/features/driver/presentation/bloc/driver_route_event.dart';
-import 'package:safe_ride_app/features/driver/presentation/bloc/driver_route_state.dart';
+import 'package:safe_ride_app/features/driver/presentation/providers/driver_navigation_provider.dart';
+import 'package:safe_ride_app/features/driver/presentation/providers/driver_route_provider.dart';
+import 'package:safe_ride_app/features/driver/presentation/providers/driver_route_state.dart';
+import 'package:safe_ride_app/features/driver/presentation/screens/driver_dashboard_screen.dart';
+import 'package:safe_ride_app/shared/providers/attendance_cache_provider.dart';
+import 'package:safe_ride_app/shared/providers/connectivity_provider.dart';
 
 import 'helpers/fake_attendance_cache_service.dart';
 
@@ -17,30 +19,53 @@ void main() {
     expect(find.byType(SafeRideApp), findsOneWidget);
   });
 
+  testWidgets('dashboard screen mounts without crashing', (WidgetTester tester) async {
+    final container = ProviderContainer(
+      overrides: [
+        attendanceCacheProvider.overrideWithValue(FakeAttendanceCacheService()),
+        connectivityProvider.overrideWith((ref) => Stream.value(true)),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(
+          home: DriverDashboardScreen(),
+        ),
+      ),
+    );
+
+    await tester.pump();
+
+    expect(find.byType(DriverDashboardScreen), findsOneWidget);
+    expect(find.byType(Scaffold), findsOneWidget);
+  });
+
   // Your colleague's attendance test
   test('attendance updates emit progress metadata', () async {
-    final bloc = DriverRouteBloc(
-      repository: MockDriverRepository(),
-      cacheService: FakeAttendanceCacheService(),
-      isOnline: true,
+    final cache = FakeAttendanceCacheService();
+    final container = ProviderContainer(
+      overrides: [
+        attendanceCacheProvider.overrideWithValue(cache),
+        connectivityProvider.overrideWith((ref) async* {
+          yield true;
+        }),
+      ],
     );
-    addTearDown(bloc.close);
+    addTearDown(container.dispose);
 
-    bloc.add(const LoadDriverRoute());
-    await Future<void>.delayed(const Duration(milliseconds: 200));
-    print('after load: ${bloc.state.runtimeType}');
-    if (bloc.state is DriverRouteError) {
-      print((bloc.state as DriverRouteError).message);
-    }
-    expect(bloc.state, isA<DriverRouteLoaded>());
+    await container.read(driverRouteProvider.future);
+    await container.read(driverRouteProvider.notifier).updateStudentAttendanceStatus(
+          studentId: 's1',
+          status: AttendanceStatus.boarded,
+        );
 
-    bloc.add(const UpdateStudentAttendanceStatus(
-      studentId: 's1',
-      status: AttendanceStatus.boarded,
-    ));
-    await Future<void>.delayed(const Duration(milliseconds: 200));
+    final state = container.read(driverRouteProvider);
+    expect(state.value, isA<DriverRouteLoaded>());
 
-    final loaded = bloc.state as DriverRouteLoaded;
+    final loaded = state.value as DriverRouteLoaded;
     expect(loaded.routeProgress, greaterThan(0.0));
     expect(loaded.gpsStatus, contains('Route progress'));
   });
