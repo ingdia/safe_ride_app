@@ -41,7 +41,7 @@ final parentDemoTripSeedProvider = Provider<ParentDemoTripSeed>((ref) {
 });
 
 final parentUnreadNotificationCountProvider = Provider<int>((ref) {
-  final notificationsState = ref.watch(parentNotificationsProvider);
+  final notificationsState = ref.watch(parentNotificationsStreamProvider);
 
   return notificationsState.maybeWhen(
     data: (notifications) {
