@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/repositories/firestore_parent_repository.dart';
+import '../../data/datasources/parent_demo_trip_seed.dart';
 import '../../domain/entities/parent_dashboard_entity.dart';
 import '../../domain/entities/parent_notification_entity.dart';
 import '../../domain/entities/parent_trip_entity.dart';
@@ -32,6 +33,10 @@ final parentNotificationsProvider =
       final repository = ref.watch(parentRepositoryProvider);
       return repository.getNotifications();
     });
+
+final parentDemoTripSeedProvider = Provider<ParentDemoTripSeed>((ref) {
+  return ParentDemoTripSeed();
+});
 
 final parentUnreadNotificationCountProvider = Provider<int>((ref) {
   final notificationsState = ref.watch(parentNotificationsProvider);

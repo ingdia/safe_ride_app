@@ -41,6 +41,8 @@ class _TrackingContent extends StatelessWidget {
           const SizedBox(height: 18),
           _LiveMapCard(trip: trip),
           const SizedBox(height: 18),
+          const _DemoTripActions(),
+          const SizedBox(height: 18),
           _CurrentTripCard(trip: trip),
           const SizedBox(height: 18),
           _RouteStopsCard(stops: trip.routeStops),
@@ -195,6 +197,64 @@ class _LiveMapCard extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DemoTripActions extends ConsumerWidget {
+  const _DemoTripActions();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return _SectionCard(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        children: [
+          Expanded(
+            child: ElevatedButton.icon(
+              onPressed: () async {
+                final seed = ref.read(parentDemoTripSeedProvider);
+                await seed.saveDemoTrip();
+
+                if (!context.mounted) return;
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Demo trip saved to Firestore.'),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.cloud_upload_outlined),
+              label: const Text('Seed Trip'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: ParentUiColors.orange,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: () async {
+                final seed = ref.read(parentDemoTripSeedProvider);
+                await seed.moveBusToNextStop();
+
+                if (!context.mounted) return;
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Bus location updated.')),
+                );
+              },
+              icon: const Icon(Icons.directions_bus_outlined),
+              label: const Text('Move Bus'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: ParentUiColors.orange,
+                side: const BorderSide(color: ParentUiColors.orange),
+              ),
+            ),
           ),
         ],
       ),
