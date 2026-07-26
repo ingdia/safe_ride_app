@@ -727,8 +727,10 @@ Future<void> _showChildDialog(
           ),
           ElevatedButton(
             onPressed: () async {
-              if (isEditing) {
-                final updatedChild = child.copyWith(
+              final existingChild = child;
+
+              if (existingChild != null) {
+                final updatedChild = existingChild.copyWith(
                   fullName: nameController.text,
                   grade: gradeController.text,
                   busNumber: busController.text,
@@ -758,7 +760,7 @@ Future<void> _showChildDialog(
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(
-                    isEditing
+                    existingChild != null
                         ? 'Child updated successfully.'
                         : 'Child added successfully.',
                   ),
