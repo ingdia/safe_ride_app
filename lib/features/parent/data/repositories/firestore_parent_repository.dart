@@ -3,7 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../domain/entities/parent_dashboard_entity.dart';
 import '../../domain/entities/parent_notification_entity.dart';
 import '../../domain/entities/parent_trip_entity.dart';
-import '../../data/repositories/parent_repository.dart';
+import '../../domain/repositories/parent_repository.dart';
+import '../datasources/parent_firestore_paths.dart';
 import '../models/parent_trip_firestore_model.dart';
 import 'mock_parent_repository.dart';
 
@@ -16,8 +17,6 @@ class FirestoreParentRepository implements ParentRepository {
   final FirebaseFirestore _firestore;
   final String activeTripId;
 
-  static const String tripsCollection = 'trips';
-
   final MockParentRepository _fallbackRepository = const MockParentRepository();
 
   @override
@@ -28,7 +27,7 @@ class FirestoreParentRepository implements ParentRepository {
   @override
   Future<ParentTripEntity> getLiveTrip() async {
     final snapshot = await _firestore
-        .collection(tripsCollection)
+        .collection(ParentFirestorePaths.trips)
         .doc(activeTripId)
         .get();
 
@@ -42,7 +41,7 @@ class FirestoreParentRepository implements ParentRepository {
   @override
   Stream<ParentTripEntity> watchLiveTrip() {
     return _firestore
-        .collection(tripsCollection)
+        .collection(ParentFirestorePaths.trips)
         .doc(activeTripId)
         .snapshots()
         .map((snapshot) {
