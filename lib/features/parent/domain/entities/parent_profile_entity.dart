@@ -32,4 +32,15 @@ class ParentProfileEntity {
       preferredLanguage: preferredLanguage ?? this.preferredLanguage,
     );
   }
+
+  ParentProfileEntity trimmed() {
+    return ParentProfileEntity(
+      parentId: parentId,
+      fullName: fullName.trim(),
+      phoneNumber: phoneNumber.trim(),
+      email: email.trim(),
+      homeAddress: homeAddress.trim(),
+      preferredLanguage: preferredLanguage.trim(),
+    );
+  }
 }

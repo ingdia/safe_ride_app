@@ -53,12 +53,14 @@ class ParentProfileFirestoreModel {
   }
 
   static Map<String, Object> toUpdateMap(ParentProfileEntity profile) {
+    final cleanProfile = profile.trimmed();
+
     return {
-      ParentProfileFields.fullName: profile.fullName,
-      ParentProfileFields.phoneNumber: profile.phoneNumber,
-      ParentProfileFields.email: profile.email,
-      ParentProfileFields.homeAddress: profile.homeAddress,
-      ParentProfileFields.preferredLanguage: profile.preferredLanguage,
+      ParentProfileFields.fullName: cleanProfile.fullName,
+      ParentProfileFields.phoneNumber: cleanProfile.phoneNumber,
+      ParentProfileFields.email: cleanProfile.email,
+      ParentProfileFields.homeAddress: cleanProfile.homeAddress,
+      ParentProfileFields.preferredLanguage: cleanProfile.preferredLanguage,
       ParentProfileFields.updatedAt: FieldValue.serverTimestamp(),
     };
   }
