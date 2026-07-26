@@ -56,4 +56,5 @@ class ParentNotificationFields {
   static const String isRead = 'isRead';
   static const String createdAt = 'createdAt';
   static const String readAt = 'readAt';
+  static const String source = 'source';
 }

@@ -2,12 +2,19 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'parent_firestore_fields.dart';
 import 'parent_firestore_paths.dart';
+import 'parent_notification_writer.dart';
 
 class ParentDemoTripSeed {
-  ParentDemoTripSeed({FirebaseFirestore? firestore, this.tripId = 'trip_001'})
-    : _firestore = firestore ?? FirebaseFirestore.instance;
+  ParentDemoTripSeed({
+    FirebaseFirestore? firestore,
+    ParentNotificationWriter? notificationWriter,
+    this.tripId = 'trip_001',
+  }) : _firestore = firestore ?? FirebaseFirestore.instance,
+       _notificationWriter =
+           notificationWriter ?? ParentNotificationWriter(firestore: firestore);
 
   final FirebaseFirestore _firestore;
+  final ParentNotificationWriter _notificationWriter;
   final String tripId;
 
   Future<void> saveDemoTrip() async {
@@ -30,6 +37,12 @@ class ParentDemoTripSeed {
       ParentTripFields.lastUpdatedAt: FieldValue.serverTimestamp(),
       ParentTripFields.routeStops: _initialRouteStops(),
     });
+
+    await _notificationWriter.createBoardedNotification(
+      childName: 'Ineza Uwase',
+      busNumber: 'Bus #12',
+      stopName: 'Kacyiru',
+    );
   }
 
   Future<void> moveBusToNextStop() async {
@@ -47,6 +60,12 @@ class ParentDemoTripSeed {
       ParentTripFields.lastUpdatedAt: FieldValue.serverTimestamp(),
       ParentTripFields.routeStops: _movedRouteStops(),
     });
+
+    await _notificationWriter.createBusMovedNotification(
+      busNumber: 'Bus #12',
+      currentStop: 'Giporoso',
+      nextStop: 'Kimironko',
+    );
   }
 
   Future<void> markTripDelayed() async {
@@ -55,6 +74,11 @@ class ParentDemoTripSeed {
       ParentTripFields.eta: '8:28 AM',
       ParentTripFields.lastUpdatedAt: FieldValue.serverTimestamp(),
     });
+
+    await _notificationWriter.createDelayNotification(
+      busNumber: 'Bus #12',
+      eta: '8:28 AM',
+    );
   }
 
   Future<void> markTripCompleted() async {
@@ -72,6 +96,11 @@ class ParentDemoTripSeed {
       ParentTripFields.lastUpdatedAt: FieldValue.serverTimestamp(),
       ParentTripFields.routeStops: _completedRouteStops(),
     });
+
+    await _notificationWriter.createArrivalNotification(
+      childName: 'Ineza Uwase',
+      schoolName: 'Kigali Parents School',
+    );
   }
 
   List<Map<String, Object>> _initialRouteStops() {
