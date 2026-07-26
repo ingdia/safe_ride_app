@@ -19,14 +19,19 @@ class ParentTripNotificationActions {
     switch (actionType) {
       case ParentTripActionType.boarded:
         await seed.saveDemoTrip();
+        break;
       case ParentTripActionType.moved:
         await seed.moveBusToNextStop();
+        break;
       case ParentTripActionType.delayed:
         await seed.markTripDelayed();
+        break;
       case ParentTripActionType.completed:
         await seed.markTripCompleted();
+        break;
       case ParentTripActionType.emergency:
         await seed.createEmergencyNotification();
+        break;
     }
 
     _ref
