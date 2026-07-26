@@ -23,3 +23,14 @@ class ParentTripFields {
   static const String stopTime = 'time';
   static const String stopPosition = 'position';
 }
+
+class ParentProfileFields {
+  const ParentProfileFields._();
+
+  static const String fullName = 'fullName';
+  static const String phoneNumber = 'phoneNumber';
+  static const String email = 'email';
+  static const String homeAddress = 'homeAddress';
+  static const String preferredLanguage = 'preferredLanguage';
+  static const String updatedAt = 'updatedAt';
+}

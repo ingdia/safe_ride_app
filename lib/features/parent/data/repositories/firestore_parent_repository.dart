@@ -5,6 +5,8 @@ import '../../domain/entities/parent_notification_entity.dart';
 import '../../domain/entities/parent_trip_entity.dart';
 import '../../data/repositories/parent_repository.dart';
 import '../datasources/parent_firestore_paths.dart';
+import '../../domain/entities/parent_profile_entity.dart';
+import '../models/parent_profile_firestore_model.dart';
 import '../models/parent_trip_firestore_model.dart';
 import 'mock_parent_repository.dart';
 
@@ -61,5 +63,49 @@ class FirestoreParentRepository implements ParentRepository {
   @override
   Future<void> markNotificationAsRead(String notificationId) {
     return _fallbackRepository.markNotificationAsRead(notificationId);
+  }
+
+  @override
+  Future<ParentProfileEntity> getParentProfile() async {
+    final snapshot = await _firestore
+        .collection(ParentFirestorePaths.parents)
+        .doc(ParentFirestorePaths.activeParentId)
+        .get();
+
+    if (!snapshot.exists) {
+      return ParentProfileFirestoreModel.fallback(
+        ParentFirestorePaths.activeParentId,
+      );
+    }
+
+    return ParentProfileFirestoreModel.fromSnapshot(snapshot);
+  }
+
+  @override
+  Stream<ParentProfileEntity> watchParentProfile() {
+    return _firestore
+        .collection(ParentFirestorePaths.parents)
+        .doc(ParentFirestorePaths.activeParentId)
+        .snapshots()
+        .map((snapshot) {
+          if (!snapshot.exists) {
+            return ParentProfileFirestoreModel.fallback(
+              ParentFirestorePaths.activeParentId,
+            );
+          }
+
+          return ParentProfileFirestoreModel.fromSnapshot(snapshot);
+        });
+  }
+
+  @override
+  Future<void> updateParentProfile(ParentProfileEntity profile) async {
+    await _firestore
+        .collection(ParentFirestorePaths.parents)
+        .doc(profile.parentId)
+        .set(
+          ParentProfileFirestoreModel.toUpdateMap(profile),
+          SetOptions(merge: true),
+        );
   }
 }

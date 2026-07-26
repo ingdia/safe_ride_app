@@ -5,6 +5,7 @@ import '../../data/datasources/parent_demo_trip_seed.dart';
 import '../../domain/entities/parent_dashboard_entity.dart';
 import '../../domain/entities/parent_notification_entity.dart';
 import '../../domain/entities/parent_trip_entity.dart';
+import '../../domain/entities/parent_profile_entity.dart';
 import '../../data/repositories/parent_repository.dart';
 
 final parentRepositoryProvider = Provider<ParentRepository>((ref) {
@@ -47,4 +48,14 @@ final parentUnreadNotificationCountProvider = Provider<int>((ref) {
     },
     orElse: () => 0,
   );
+});
+
+final parentProfileProvider = FutureProvider<ParentProfileEntity>((ref) async {
+  final repository = ref.watch(parentRepositoryProvider);
+  return repository.getParentProfile();
+});
+
+final parentProfileStreamProvider = StreamProvider<ParentProfileEntity>((ref) {
+  final repository = ref.watch(parentRepositoryProvider);
+  return repository.watchParentProfile();
 });

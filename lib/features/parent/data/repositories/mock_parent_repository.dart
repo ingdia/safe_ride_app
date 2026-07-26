@@ -1,6 +1,7 @@
 import '../../domain/entities/parent_dashboard_entity.dart';
 import '../../domain/entities/parent_notification_entity.dart';
 import '../../domain/entities/parent_trip_entity.dart';
+import '../../domain/entities/parent_profile_entity.dart';
 import 'parent_repository.dart';
 
 class MockParentRepository implements ParentRepository {
@@ -167,5 +168,29 @@ class MockParentRepository implements ParentRepository {
   @override
   Future<void> markNotificationAsRead(String notificationId) async {
     await Future<void>.delayed(const Duration(milliseconds: 200));
+  }
+
+  @override
+  Future<ParentProfileEntity> getParentProfile() async {
+    await Future<void>.delayed(const Duration(milliseconds: 250));
+
+    return const ParentProfileEntity(
+      parentId: 'parent_001',
+      fullName: 'Uwimana Claudine',
+      phoneNumber: '+250 788 000 111',
+      email: 'parent@saferide.rw',
+      homeAddress: 'Kacyiru, Kigali',
+      preferredLanguage: 'English',
+    );
+  }
+
+  @override
+  Stream<ParentProfileEntity> watchParentProfile() async* {
+    yield await getParentProfile();
+  }
+
+  @override
+  Future<void> updateParentProfile(ParentProfileEntity profile) async {
+    await Future<void>.delayed(const Duration(milliseconds: 250));
   }
 }
