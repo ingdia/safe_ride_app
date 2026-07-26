@@ -7,6 +7,7 @@ import '../../domain/entities/parent_notification_entity.dart';
 import '../../domain/entities/parent_trip_entity.dart';
 import '../../domain/entities/parent_profile_entity.dart';
 import '../../data/repositories/parent_repository.dart';
+import '../../domain/entities/parent_child_entity.dart';
 
 final parentRepositoryProvider = Provider<ParentRepository>((ref) {
   return FirestoreParentRepository();
@@ -58,4 +59,11 @@ final parentProfileProvider = FutureProvider<ParentProfileEntity>((ref) async {
 final parentProfileStreamProvider = StreamProvider<ParentProfileEntity>((ref) {
   final repository = ref.watch(parentRepositoryProvider);
   return repository.watchParentProfile();
+});
+
+final parentChildrenStreamProvider = StreamProvider<List<ParentChildEntity>>((
+  ref,
+) {
+  final repository = ref.watch(parentRepositoryProvider);
+  return repository.watchChildren();
 });

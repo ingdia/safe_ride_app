@@ -1,6 +1,7 @@
 import '../../domain/entities/parent_dashboard_entity.dart';
 import '../../domain/entities/parent_notification_entity.dart';
 import '../../domain/entities/parent_trip_entity.dart';
+import '../../domain/entities/parent_child_entity.dart';
 import '../../domain/entities/parent_profile_entity.dart';
 
 abstract class ParentRepository {
@@ -19,4 +20,12 @@ abstract class ParentRepository {
   Stream<ParentProfileEntity> watchParentProfile();
 
   Future<void> updateParentProfile(ParentProfileEntity profile);
+
+  Stream<List<ParentChildEntity>> watchChildren();
+
+  Future<void> addChild(ParentChildEntity child);
+
+  Future<void> updateChild(ParentChildEntity child);
+
+  Future<void> deleteChild(String childId);
 }

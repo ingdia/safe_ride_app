@@ -6,6 +6,8 @@ import '../../domain/entities/parent_trip_entity.dart';
 import '../../data/repositories/parent_repository.dart';
 import '../datasources/parent_firestore_paths.dart';
 import '../../domain/entities/parent_profile_entity.dart';
+import '../../domain/entities/parent_child_entity.dart';
+import '../models/parent_child_firestore_model.dart';
 import '../models/parent_profile_firestore_model.dart';
 import '../models/parent_trip_firestore_model.dart';
 import 'mock_parent_repository.dart';
@@ -107,5 +109,59 @@ class FirestoreParentRepository implements ParentRepository {
           ParentProfileFirestoreModel.toUpdateMap(profile),
           SetOptions(merge: true),
         );
+  }
+
+  @override
+  Stream<List<ParentChildEntity>> watchChildren() {
+    return _firestore
+        .collection(
+          ParentFirestorePaths.parentChildren(
+            ParentFirestorePaths.activeParentId,
+          ),
+        )
+        .snapshots()
+        .map((snapshot) {
+          return snapshot.docs
+              .map(ParentChildFirestoreModel.fromSnapshot)
+              .toList();
+        });
+  }
+
+  @override
+  Future<void> addChild(ParentChildEntity child) async {
+    await _firestore
+        .collection(
+          ParentFirestorePaths.parentChildren(
+            ParentFirestorePaths.activeParentId,
+          ),
+        )
+        .add(ParentChildFirestoreModel.toCreateMap(child));
+  }
+
+  @override
+  Future<void> updateChild(ParentChildEntity child) async {
+    await _firestore
+        .collection(
+          ParentFirestorePaths.parentChildren(
+            ParentFirestorePaths.activeParentId,
+          ),
+        )
+        .doc(child.id)
+        .set(
+          ParentChildFirestoreModel.toUpdateMap(child),
+          SetOptions(merge: true),
+        );
+  }
+
+  @override
+  Future<void> deleteChild(String childId) async {
+    await _firestore
+        .collection(
+          ParentFirestorePaths.parentChildren(
+            ParentFirestorePaths.activeParentId,
+          ),
+        )
+        .doc(childId)
+        .delete();
   }
 }

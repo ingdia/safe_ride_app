@@ -2,6 +2,7 @@ import '../../domain/entities/parent_dashboard_entity.dart';
 import '../../domain/entities/parent_notification_entity.dart';
 import '../../domain/entities/parent_trip_entity.dart';
 import '../../domain/entities/parent_profile_entity.dart';
+import '../../domain/entities/parent_child_entity.dart';
 import 'parent_repository.dart';
 
 class MockParentRepository implements ParentRepository {
@@ -191,6 +192,41 @@ class MockParentRepository implements ParentRepository {
 
   @override
   Future<void> updateParentProfile(ParentProfileEntity profile) async {
+    await Future<void>.delayed(const Duration(milliseconds: 250));
+  }
+
+  @override
+  Stream<List<ParentChildEntity>> watchChildren() async* {
+    yield const [
+      ParentChildEntity(
+        id: 'child_001',
+        fullName: 'Ineza Uwase',
+        grade: 'Primary 4',
+        busNumber: 'Bus #12',
+        pickupStop: 'Kacyiru',
+      ),
+      ParentChildEntity(
+        id: 'child_002',
+        fullName: 'Ganza Ntwali',
+        grade: 'Primary 1',
+        busNumber: 'Bus #12',
+        pickupStop: 'Gishushu',
+      ),
+    ];
+  }
+
+  @override
+  Future<void> addChild(ParentChildEntity child) async {
+    await Future<void>.delayed(const Duration(milliseconds: 250));
+  }
+
+  @override
+  Future<void> updateChild(ParentChildEntity child) async {
+    await Future<void>.delayed(const Duration(milliseconds: 250));
+  }
+
+  @override
+  Future<void> deleteChild(String childId) async {
     await Future<void>.delayed(const Duration(milliseconds: 250));
   }
 }

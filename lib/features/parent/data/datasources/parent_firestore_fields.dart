@@ -34,3 +34,14 @@ class ParentProfileFields {
   static const String preferredLanguage = 'preferredLanguage';
   static const String updatedAt = 'updatedAt';
 }
+
+class ParentChildFields {
+  const ParentChildFields._();
+
+  static const String fullName = 'fullName';
+  static const String grade = 'grade';
+  static const String busNumber = 'busNumber';
+  static const String pickupStop = 'pickupStop';
+  static const String createdAt = 'createdAt';
+  static const String updatedAt = 'updatedAt';
+}
