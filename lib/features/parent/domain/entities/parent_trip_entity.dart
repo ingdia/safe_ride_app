@@ -33,6 +33,9 @@ class ParentTripEntity {
     required this.progress,
     required this.status,
     required this.routeStops,
+    this.busLatitude = -1.9441,
+    this.busLongitude = 30.0619,
+    this.lastUpdatedLabel = 'Live now',
   });
 
   final String tripId;
@@ -49,6 +52,10 @@ class ParentTripEntity {
   final ParentTripStatus status;
   final List<ParentRouteStopEntity> routeStops;
 
+  final double busLatitude;
+  final double busLongitude;
+  final String lastUpdatedLabel;
+
   bool get isOnTime {
     return status == ParentTripStatus.onTime;
   }
@@ -56,7 +63,7 @@ class ParentTripEntity {
   String get statusLabel {
     switch (status) {
       case ParentTripStatus.onTime:
-        return 'On time';
+        return 'On Time';
       case ParentTripStatus.delayed:
         return 'Delayed';
       case ParentTripStatus.completed:
