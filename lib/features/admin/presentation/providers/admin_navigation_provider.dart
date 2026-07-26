@@ -2,10 +2,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 enum AdminTab {
   dashboard,
-  buses,
-  users,
   emergency,
-  settings,
+  map,
+  alerts,
+  profile,
 }
 
 final adminNavigationProvider =
@@ -29,13 +29,13 @@ extension AdminTabExtension on AdminTab {
     switch (this) {
       case AdminTab.dashboard:
         return 0;
-      case AdminTab.buses:
-        return 1;
-      case AdminTab.users:
-        return 2;
       case AdminTab.emergency:
+        return 1;
+      case AdminTab.map:
+        return 2;
+      case AdminTab.alerts:
         return 3;
-      case AdminTab.settings:
+      case AdminTab.profile:
         return 4;
     }
   }
@@ -44,14 +44,14 @@ extension AdminTabExtension on AdminTab {
     switch (this) {
       case AdminTab.dashboard:
         return 'Dashboard';
-      case AdminTab.buses:
-        return 'Buses';
-      case AdminTab.users:
-        return 'Users';
       case AdminTab.emergency:
         return 'Emergency';
-      case AdminTab.settings:
-        return 'Settings';
+      case AdminTab.map:
+        return 'Map';
+      case AdminTab.alerts:
+        return 'Alerts';
+      case AdminTab.profile:
+        return 'Profile';
     }
   }
 }
@@ -59,13 +59,13 @@ extension AdminTabExtension on AdminTab {
 AdminTab adminTabFromIndex(int index) {
   switch (index) {
     case 1:
-      return AdminTab.buses;
-    case 2:
-      return AdminTab.users;
-    case 3:
       return AdminTab.emergency;
+    case 2:
+      return AdminTab.map;
+    case 3:
+      return AdminTab.alerts;
     case 4:
-      return AdminTab.settings;
+      return AdminTab.profile;
     case 0:
     default:
       return AdminTab.dashboard;

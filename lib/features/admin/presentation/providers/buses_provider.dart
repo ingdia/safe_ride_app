@@ -6,10 +6,6 @@ final busesRepositoryProvider = Provider<BusesRepository>((ref) {
   return BusesRepository();
 });
 
-/// Riverpod 3.x Notifier-based controller for the bus roster, mirroring
-/// the Notifier pattern used by ParentNavigationController. Backed by
-/// BusesRepository (mock in-memory data layer) so Fleet Overview can
-/// add/edit/delete buses at runtime.
 class BusesController extends Notifier<List<BusModel>> {
   @override
   List<BusModel> build() {
