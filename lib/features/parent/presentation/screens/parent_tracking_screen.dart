@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../domain/entities/parent_trip_action_type.dart';
 import '../../domain/entities/parent_trip_entity.dart';
 import '../providers/parent_data_providers.dart';
+import '../providers/parent_trip_notification_actions_provider.dart';
 import '../widgets/parent_ui_constants.dart';
 
 class ParentTrackingScreen extends ConsumerWidget {
@@ -221,11 +223,12 @@ class _DemoTripActions extends ConsumerWidget {
                   label: 'Seed Trip',
                   isFilled: true,
                   onPressed: () {
-                    _runSeedAction(
+                    _runTripAction(
                       context,
                       ref,
-                      action: (seed) => seed.saveDemoTrip(),
-                      successMessage: 'Demo trip saved to Firestore.',
+                      actionType: ParentTripActionType.boarded,
+                      successMessage:
+                          'Trip seeded and boarded notification created.',
                     );
                   },
                 ),
@@ -236,11 +239,11 @@ class _DemoTripActions extends ConsumerWidget {
                   icon: Icons.directions_bus_outlined,
                   label: 'Move Bus',
                   onPressed: () {
-                    _runSeedAction(
+                    _runTripAction(
                       context,
                       ref,
-                      action: (seed) => seed.moveBusToNextStop(),
-                      successMessage: 'Bus location updated.',
+                      actionType: ParentTripActionType.moved,
+                      successMessage: 'Bus moved and notification created.',
                     );
                   },
                 ),
@@ -255,11 +258,11 @@ class _DemoTripActions extends ConsumerWidget {
                   icon: Icons.warning_amber_outlined,
                   label: 'Delay',
                   onPressed: () {
-                    _runSeedAction(
+                    _runTripAction(
                       context,
                       ref,
-                      action: (seed) => seed.markTripDelayed(),
-                      successMessage: 'Trip marked as delayed.',
+                      actionType: ParentTripActionType.delayed,
+                      successMessage: 'Delay notification created.',
                     );
                   },
                 ),
@@ -270,11 +273,11 @@ class _DemoTripActions extends ConsumerWidget {
                   icon: Icons.check_circle_outline,
                   label: 'Complete',
                   onPressed: () {
-                    _runSeedAction(
+                    _runTripAction(
                       context,
                       ref,
-                      action: (seed) => seed.markTripCompleted(),
-                      successMessage: 'Trip marked as completed.',
+                      actionType: ParentTripActionType.completed,
+                      successMessage: 'Arrival notification created.',
                     );
                   },
                 ),
@@ -286,15 +289,15 @@ class _DemoTripActions extends ConsumerWidget {
     );
   }
 
-  Future<void> _runSeedAction(
+  Future<void> _runTripAction(
     BuildContext context,
     WidgetRef ref, {
-    required Future<void> Function(dynamic seed) action,
+    required ParentTripActionType actionType,
     required String successMessage,
   }) async {
-    final seed = ref.read(parentDemoTripSeedProvider);
-
-    await action(seed);
+    await ref
+        .read(parentTripNotificationActionsProvider)
+        .runTripAction(actionType);
 
     if (!context.mounted) return;
 
