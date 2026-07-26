@@ -112,6 +112,11 @@ class MockParentRepository implements ParentRepository {
   }
 
   @override
+  Stream<ParentTripEntity> watchLiveTrip() async* {
+    yield await getLiveTrip();
+  }
+
+  @override
   Future<List<ParentNotificationEntity>> getNotifications() async {
     await Future<void>.delayed(const Duration(milliseconds: 300));
 

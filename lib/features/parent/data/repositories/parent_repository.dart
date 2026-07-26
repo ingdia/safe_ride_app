@@ -9,5 +9,7 @@ abstract class ParentRepository {
 
   Future<List<ParentNotificationEntity>> getNotifications();
 
+  Stream<ParentTripEntity> watchLiveTrip();
+
   Future<void> markNotificationAsRead(String notificationId);
 }
