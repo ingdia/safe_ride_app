@@ -81,4 +81,16 @@ class ParentNotificationWriter {
       ),
     );
   }
+
+  Future<void> createEmergencyNotification({required String busNumber}) {
+    return createNotification(
+      ParentNotificationCreateModel(
+        parentId: ParentFirestorePaths.activeParentId,
+        title: 'Emergency alert',
+        message:
+            'Emergency alert reported for $busNumber. Please contact support.',
+        type: 'emergency',
+      ),
+    );
+  }
 }

@@ -1,1 +1,1 @@
-enum ParentTripActionType { boarded, moved, delayed, completed }
+enum ParentTripActionType { boarded, moved, delayed, completed, emergency }

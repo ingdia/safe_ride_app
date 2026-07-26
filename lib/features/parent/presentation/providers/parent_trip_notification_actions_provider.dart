@@ -25,6 +25,8 @@ class ParentTripNotificationActions {
         await seed.markTripDelayed();
       case ParentTripActionType.completed:
         await seed.markTripCompleted();
+      case ParentTripActionType.emergency:
+        await seed.createEmergencyNotification();
     }
 
     _ref

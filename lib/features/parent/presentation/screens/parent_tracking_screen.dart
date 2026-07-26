@@ -18,12 +18,84 @@ class ParentTrackingScreen extends ConsumerWidget {
       backgroundColor: ParentUiColors.background,
       body: SafeArea(
         child: tripState.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
+          loading: () =>
+              _TrackingContent(trip: _fallbackTrip('Waiting for live data...')),
           error: (error, stackTrace) =>
-              _TrackingErrorState(message: error.toString()),
+              _TrackingContent(trip: _fallbackTrip('Using offline fallback')),
           data: (trip) => _TrackingContent(trip: trip),
         ),
       ),
+    );
+  }
+
+  ParentTripEntity _fallbackTrip(String label) {
+    return ParentTripEntity(
+      tripId: 'trip_001',
+      childName: 'Ineza Uwase',
+      schoolName: 'Kigali Parents School',
+      grade: 'Primary 4',
+      busNumber: 'Bus #12',
+      driverName: 'Jean Bosco',
+      currentStop: 'Remera',
+      nextStop: 'Giporoso',
+      eta: '8:15 AM',
+      stopsAway: 4,
+      progress: 0.42,
+      status: ParentTripStatus.onTime,
+      busLatitude: -1.9565,
+      busLongitude: 30.1044,
+      lastUpdatedLabel: label,
+      routeStops: const [
+        ParentRouteStopEntity(
+          id: 'stop_001',
+          name: 'Kacyiru',
+          time: '3 students',
+          status: ParentRouteStopStatus.completed,
+          position: 1,
+        ),
+        ParentRouteStopEntity(
+          id: 'stop_002',
+          name: 'Gishushu',
+          time: '2 students',
+          status: ParentRouteStopStatus.completed,
+          position: 2,
+        ),
+        ParentRouteStopEntity(
+          id: 'stop_003',
+          name: 'Remera',
+          time: '4 students',
+          status: ParentRouteStopStatus.current,
+          position: 3,
+        ),
+        ParentRouteStopEntity(
+          id: 'stop_004',
+          name: 'Giporoso',
+          time: '2 students',
+          status: ParentRouteStopStatus.upcoming,
+          position: 4,
+        ),
+        ParentRouteStopEntity(
+          id: 'stop_005',
+          name: 'Kimironko',
+          time: '3 students',
+          status: ParentRouteStopStatus.upcoming,
+          position: 5,
+        ),
+        ParentRouteStopEntity(
+          id: 'stop_006',
+          name: 'Kibagabaga',
+          time: '2 students',
+          status: ParentRouteStopStatus.upcoming,
+          position: 6,
+        ),
+        ParentRouteStopEntity(
+          id: 'stop_007',
+          name: 'Kigali Parents School',
+          time: 'School arrival',
+          status: ParentRouteStopStatus.upcoming,
+          position: 7,
+        ),
+      ],
     );
   }
 }
@@ -123,7 +195,6 @@ class _LiveMapCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return _SectionCard(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         children: [
           Container(
@@ -212,77 +283,74 @@ class _DemoTripActions extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return _SectionCard(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: _DemoActionButton(
-                  icon: Icons.cloud_upload_outlined,
-                  label: 'Seed Trip',
-                  isFilled: true,
-                  onPressed: () {
-                    _runTripAction(
-                      context,
-                      ref,
-                      actionType: ParentTripActionType.boarded,
-                      successMessage:
-                          'Trip seeded and boarded notification created.',
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _DemoActionButton(
-                  icon: Icons.directions_bus_outlined,
-                  label: 'Move Bus',
-                  onPressed: () {
-                    _runTripAction(
-                      context,
-                      ref,
-                      actionType: ParentTripActionType.moved,
-                      successMessage: 'Bus moved and notification created.',
-                    );
-                  },
-                ),
-              ),
-            ],
+          _DemoActionButton(
+            icon: Icons.cloud_upload_outlined,
+            label: 'Seed Trip',
+            isFilled: true,
+            onPressed: () {
+              _runTripAction(
+                context,
+                ref,
+                actionType: ParentTripActionType.boarded,
+                successMessage: 'Trip seeded and boarded notification created.',
+              );
+            },
           ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _DemoActionButton(
-                  icon: Icons.warning_amber_outlined,
-                  label: 'Delay',
-                  onPressed: () {
-                    _runTripAction(
-                      context,
-                      ref,
-                      actionType: ParentTripActionType.delayed,
-                      successMessage: 'Delay notification created.',
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _DemoActionButton(
-                  icon: Icons.check_circle_outline,
-                  label: 'Complete',
-                  onPressed: () {
-                    _runTripAction(
-                      context,
-                      ref,
-                      actionType: ParentTripActionType.completed,
-                      successMessage: 'Arrival notification created.',
-                    );
-                  },
-                ),
-              ),
-            ],
+          const SizedBox(height: 10),
+          _DemoActionButton(
+            icon: Icons.directions_bus_outlined,
+            label: 'Move Bus',
+            onPressed: () {
+              _runTripAction(
+                context,
+                ref,
+                actionType: ParentTripActionType.moved,
+                successMessage: 'Bus moved and notification created.',
+              );
+            },
+          ),
+          const SizedBox(height: 10),
+          _DemoActionButton(
+            icon: Icons.warning_amber_outlined,
+            label: 'Delay',
+            onPressed: () {
+              _runTripAction(
+                context,
+                ref,
+                actionType: ParentTripActionType.delayed,
+                successMessage: 'Delay notification created.',
+              );
+            },
+          ),
+          const SizedBox(height: 10),
+          _DemoActionButton(
+            icon: Icons.check_circle_outline,
+            label: 'Complete',
+            onPressed: () {
+              _runTripAction(
+                context,
+                ref,
+                actionType: ParentTripActionType.completed,
+                successMessage: 'Arrival notification created.',
+              );
+            },
+          ),
+          const SizedBox(height: 10),
+          _DemoActionButton(
+            icon: Icons.emergency_outlined,
+            label: 'Emergency Alert',
+            isDanger: true,
+            onPressed: () {
+              _runTripAction(
+                context,
+                ref,
+                actionType: ParentTripActionType.emergency,
+                successMessage: 'Emergency notification created.',
+              );
+            },
           ),
         ],
       ),
@@ -313,34 +381,50 @@ class _DemoActionButton extends StatelessWidget {
     required this.label,
     required this.onPressed,
     this.isFilled = false,
+    this.isDanger = false,
   });
 
   final IconData icon;
   final String label;
   final VoidCallback onPressed;
   final bool isFilled;
+  final bool isDanger;
 
   @override
   Widget build(BuildContext context) {
     if (isFilled) {
-      return ElevatedButton.icon(
-        onPressed: onPressed,
-        icon: Icon(icon),
-        label: Text(label),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: ParentUiColors.orange,
-          foregroundColor: Colors.white,
+      return SizedBox(
+        height: 46,
+        child: ElevatedButton.icon(
+          onPressed: onPressed,
+          icon: Icon(icon),
+          label: Text(label),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: ParentUiColors.orange,
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ),
         ),
       );
     }
 
-    return OutlinedButton.icon(
-      onPressed: onPressed,
-      icon: Icon(icon),
-      label: Text(label),
-      style: OutlinedButton.styleFrom(
-        foregroundColor: ParentUiColors.orange,
-        side: const BorderSide(color: ParentUiColors.orange),
+    return SizedBox(
+      height: 46,
+      child: OutlinedButton.icon(
+        onPressed: onPressed,
+        icon: Icon(icon),
+        label: Text(label),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: isDanger ? Colors.red : ParentUiColors.orange,
+          side: BorderSide(
+            color: isDanger ? Colors.red : ParentUiColors.orange,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+        ),
       ),
     );
   }
@@ -354,7 +438,6 @@ class _CurrentTripCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return _SectionCard(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -405,7 +488,6 @@ class _RouteStopsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return _SectionCard(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -568,6 +650,7 @@ class _MapBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
       ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, color: ParentUiColors.orange, size: 18),
           const SizedBox(width: 6),
@@ -579,15 +662,15 @@ class _MapBadge extends StatelessWidget {
 }
 
 class _SectionCard extends StatelessWidget {
-  const _SectionCard({required this.child, required this.margin});
+  const _SectionCard({required this.child});
 
   final Widget child;
-  final EdgeInsetsGeometry margin;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: margin,
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -601,26 +684,6 @@ class _SectionCard extends StatelessWidget {
         ],
       ),
       child: child,
-    );
-  }
-}
-
-class _TrackingErrorState extends StatelessWidget {
-  const _TrackingErrorState({required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Text(
-          'Unable to load live tracking.\n$message',
-          textAlign: TextAlign.center,
-          style: const TextStyle(fontWeight: FontWeight.w700),
-        ),
-      ),
     );
   }
 }

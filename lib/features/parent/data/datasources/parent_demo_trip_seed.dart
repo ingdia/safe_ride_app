@@ -3,7 +3,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'parent_firestore_fields.dart';
 import 'parent_firestore_paths.dart';
 import 'parent_notification_writer.dart';
-import '../models/parent_notification_create_model.dart';
 
 class ParentDemoTripSeed {
   ParentDemoTripSeed({
@@ -283,14 +282,6 @@ class ParentDemoTripSeed {
   }
 
   Future<void> createEmergencyNotification() async {
-    await _notificationWriter.createNotification(
-      const ParentNotificationCreateModel(
-        parentId: ParentFirestorePaths.activeParentId,
-        title: 'Emergency alert',
-        message:
-            'Emergency alert reported for Bus #12. Please contact support.',
-        type: 'emergency',
-      ),
-    );
+    await _notificationWriter.createEmergencyNotification(busNumber: 'Bus #12');
   }
 }
