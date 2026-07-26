@@ -28,4 +28,8 @@ abstract class ParentRepository {
   Future<void> updateChild(ParentChildEntity child);
 
   Future<void> deleteChild(String childId);
+
+  Stream<List<ParentNotificationEntity>> watchNotifications();
+
+  Future<void> markAllNotificationsAsRead();
 }

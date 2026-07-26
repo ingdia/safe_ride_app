@@ -229,4 +229,14 @@ class MockParentRepository implements ParentRepository {
   Future<void> deleteChild(String childId) async {
     await Future<void>.delayed(const Duration(milliseconds: 250));
   }
+
+  @override
+  Stream<List<ParentNotificationEntity>> watchNotifications() async* {
+    yield await getNotifications();
+  }
+
+  @override
+  Future<void> markAllNotificationsAsRead() async {
+    await Future<void>.delayed(const Duration(milliseconds: 250));
+  }
 }

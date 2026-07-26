@@ -10,6 +10,7 @@ import '../../domain/entities/parent_child_entity.dart';
 import '../models/parent_child_firestore_model.dart';
 import '../models/parent_profile_firestore_model.dart';
 import '../models/parent_trip_firestore_model.dart';
+import '../models/parent_notification_firestore_model.dart';
 import 'mock_parent_repository.dart';
 
 class FirestoreParentRepository implements ParentRepository {
@@ -58,13 +59,68 @@ class FirestoreParentRepository implements ParentRepository {
   }
 
   @override
-  Future<List<ParentNotificationEntity>> getNotifications() {
-    return _fallbackRepository.getNotifications();
+  Future<List<ParentNotificationEntity>> getNotifications() async {
+    final snapshot = await _firestore
+        .collection(ParentFirestorePaths.notifications)
+        .where(
+          ParentNotificationFields.parentId,
+          isEqualTo: ParentFirestorePaths.activeParentId,
+        )
+        .get();
+
+    return snapshot.docs
+        .map(ParentNotificationFirestoreModel.fromSnapshot)
+        .toList();
   }
 
   @override
-  Future<void> markNotificationAsRead(String notificationId) {
-    return _fallbackRepository.markNotificationAsRead(notificationId);
+  Stream<List<ParentNotificationEntity>> watchNotifications() {
+    return _firestore
+        .collection(ParentFirestorePaths.notifications)
+        .where(
+          ParentNotificationFields.parentId,
+          isEqualTo: ParentFirestorePaths.activeParentId,
+        )
+        .snapshots()
+        .map((snapshot) {
+          return snapshot.docs
+              .map(ParentNotificationFirestoreModel.fromSnapshot)
+              .toList();
+        });
+  }
+
+  @override
+  Future<void> markNotificationAsRead(String notificationId) async {
+    await _firestore
+        .collection(ParentFirestorePaths.notifications)
+        .doc(notificationId)
+        .set({
+          ParentNotificationFields.isRead: true,
+          ParentNotificationFields.readAt: FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+  }
+
+  @override
+  Future<void> markAllNotificationsAsRead() async {
+    final snapshot = await _firestore
+        .collection(ParentFirestorePaths.notifications)
+        .where(
+          ParentNotificationFields.parentId,
+          isEqualTo: ParentFirestorePaths.activeParentId,
+        )
+        .where(ParentNotificationFields.isRead, isEqualTo: false)
+        .get();
+
+    final batch = _firestore.batch();
+
+    for (final document in snapshot.docs) {
+      batch.set(document.reference, {
+        ParentNotificationFields.isRead: true,
+        ParentNotificationFields.readAt: FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    }
+
+    await batch.commit();
   }
 
   @override

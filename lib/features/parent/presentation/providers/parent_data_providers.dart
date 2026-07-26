@@ -67,3 +67,9 @@ final parentChildrenStreamProvider = StreamProvider<List<ParentChildEntity>>((
   final repository = ref.watch(parentRepositoryProvider);
   return repository.watchChildren();
 });
+
+final parentNotificationsStreamProvider =
+    StreamProvider<List<ParentNotificationEntity>>((ref) {
+      final repository = ref.watch(parentRepositoryProvider);
+      return repository.watchNotifications();
+    });
