@@ -3,9 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/entities/parent_child_entity.dart';
 import '../../domain/entities/parent_profile_entity.dart';
-import '../providers/parent_children_provider.dart';
 import '../providers/parent_data_providers.dart';
 import '../providers/parent_profile_actions_provider.dart';
+import '../providers/parent_children_actions_provider.dart';
 import '../widgets/parent_ui_constants.dart';
 
 class ParentProfileScreen extends ConsumerWidget {
@@ -14,7 +14,7 @@ class ParentProfileScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final profileState = ref.watch(parentProfileStreamProvider);
-    final children = ref.watch(parentChildrenProvider);
+    final childrenState = ref.watch(parentChildrenStreamProvider);
 
     return Scaffold(
       backgroundColor: ParentUiColors.background,
@@ -24,7 +24,10 @@ class ParentProfileScreen extends ConsumerWidget {
           error: (error, stackTrace) =>
               _ProfileErrorState(message: error.toString()),
           data: (profile) {
-            return _ProfileContent(profile: profile, children: children);
+            return _ProfileContent(
+              profile: profile,
+              childrenState: childrenState,
+            );
           },
         ),
       ),
@@ -33,10 +36,10 @@ class ParentProfileScreen extends ConsumerWidget {
 }
 
 class _ProfileContent extends ConsumerWidget {
-  const _ProfileContent({required this.profile, required this.children});
+  const _ProfileContent({required this.profile, required this.childrenState});
 
   final ParentProfileEntity profile;
-  final List<ParentChildEntity> children;
+  final AsyncValue<List<ParentChildEntity>> childrenState;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -48,7 +51,7 @@ class _ProfileContent extends ConsumerWidget {
           const SizedBox(height: 18),
           _ParentInfoCard(profile: profile),
           const SizedBox(height: 18),
-          _ChildrenCard(children: children),
+          _ChildrenCard(childrenState: childrenState),
           const SizedBox(height: 18),
           _SettingsCard(profile: profile),
           const SizedBox(height: 18),
@@ -163,10 +166,9 @@ class _ParentInfoCard extends StatelessWidget {
 }
 
 class _ChildrenCard extends ConsumerWidget {
-  const _ChildrenCard({required this.children});
+  const _ChildrenCard({required this.childrenState});
 
-  final List<ParentChildEntity> children;
-
+  final AsyncValue<List<ParentChildEntity>> childrenState;
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return _SectionCard(
@@ -189,13 +191,33 @@ class _ChildrenCard extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 10),
-          if (children.isEmpty)
-            const Text(
-              'No child added yet.',
-              style: TextStyle(fontWeight: FontWeight.w600),
-            )
-          else
-            for (final child in children) _ChildTile(child: child),
+          childrenState.when(
+            loading: () => const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: LinearProgressIndicator(),
+            ),
+            error: (error, stackTrace) => Text(
+              'Unable to load children.',
+              style: TextStyle(
+                color: Colors.red.shade700,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            data: (children) {
+              if (children.isEmpty) {
+                return const Text(
+                  'No child added yet.',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                );
+              }
+
+              return Column(
+                children: [
+                  for (final child in children) _ChildTile(child: child),
+                ],
+              );
+            },
+          ),
         ],
       ),
     );
@@ -704,30 +726,34 @@ Future<void> _showChildDialog(
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               if (isEditing) {
                 final updatedChild = child.copyWith(
-                  fullName: nameController.text.trim(),
-                  grade: gradeController.text.trim(),
-                  busNumber: busController.text.trim(),
-                  pickupStop: stopController.text.trim(),
+                  fullName: nameController.text,
+                  grade: gradeController.text,
+                  busNumber: busController.text,
+                  pickupStop: stopController.text,
                 );
 
-                ref
-                    .read(parentChildrenProvider.notifier)
+                await ref
+                    .read(parentChildrenActionsProvider)
                     .updateChild(updatedChild);
               } else {
-                ref
-                    .read(parentChildrenProvider.notifier)
+                await ref
+                    .read(parentChildrenActionsProvider)
                     .addChild(
-                      fullName: nameController.text.trim(),
-                      grade: gradeController.text.trim(),
-                      busNumber: busController.text.trim(),
-                      pickupStop: stopController.text.trim(),
+                      fullName: nameController.text,
+                      grade: gradeController.text,
+                      busNumber: busController.text,
+                      pickupStop: stopController.text,
                     );
               }
 
+              if (!dialogContext.mounted) return;
+
               Navigator.pop(dialogContext);
+
+              if (!context.mounted) return;
 
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
@@ -769,10 +795,16 @@ Future<void> _confirmRemoveChild(
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () {
-              ref.read(parentChildrenProvider.notifier).removeChild(child.id);
+            onPressed: () async {
+              await ref
+                  .read(parentChildrenActionsProvider)
+                  .deleteChild(child.id);
+
+              if (!dialogContext.mounted) return;
 
               Navigator.pop(dialogContext);
+
+              if (!context.mounted) return;
 
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Child removed successfully.')),

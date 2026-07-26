@@ -22,11 +22,11 @@ class ParentChildrenActions {
 
     final child = ParentChildEntity(
       id: '',
-      fullName: fullName.trim(),
-      grade: grade.trim(),
-      busNumber: busNumber.trim(),
-      pickupStop: pickupStop.trim(),
-    );
+      fullName: fullName,
+      grade: grade,
+      busNumber: busNumber,
+      pickupStop: pickupStop,
+    ).trimmed();
 
     await repository.addChild(child);
 
@@ -36,14 +36,7 @@ class ParentChildrenActions {
   Future<void> updateChild(ParentChildEntity child) async {
     final repository = _ref.read(parentRepositoryProvider);
 
-    await repository.updateChild(
-      child.copyWith(
-        fullName: child.fullName.trim(),
-        grade: child.grade.trim(),
-        busNumber: child.busNumber.trim(),
-        pickupStop: child.pickupStop.trim(),
-      ),
-    );
+    await repository.updateChild(child.trimmed());
 
     _ref.invalidate(parentChildrenStreamProvider);
   }
