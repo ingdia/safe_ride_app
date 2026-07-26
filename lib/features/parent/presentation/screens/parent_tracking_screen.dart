@@ -211,52 +211,133 @@ class _DemoTripActions extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return _SectionCard(
       margin: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
+      child: Column(
         children: [
-          Expanded(
-            child: ElevatedButton.icon(
-              onPressed: () async {
-                final seed = ref.read(parentDemoTripSeedProvider);
-                await seed.saveDemoTrip();
-
-                if (!context.mounted) return;
-
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Demo trip saved to Firestore.'),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.cloud_upload_outlined),
-              label: const Text('Seed Trip'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: ParentUiColors.orange,
-                foregroundColor: Colors.white,
+          Row(
+            children: [
+              Expanded(
+                child: _DemoActionButton(
+                  icon: Icons.cloud_upload_outlined,
+                  label: 'Seed Trip',
+                  isFilled: true,
+                  onPressed: () {
+                    _runSeedAction(
+                      context,
+                      ref,
+                      action: (seed) => seed.saveDemoTrip(),
+                      successMessage: 'Demo trip saved to Firestore.',
+                    );
+                  },
+                ),
               ),
-            ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _DemoActionButton(
+                  icon: Icons.directions_bus_outlined,
+                  label: 'Move Bus',
+                  onPressed: () {
+                    _runSeedAction(
+                      context,
+                      ref,
+                      action: (seed) => seed.moveBusToNextStop(),
+                      successMessage: 'Bus location updated.',
+                    );
+                  },
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: OutlinedButton.icon(
-              onPressed: () async {
-                final seed = ref.read(parentDemoTripSeedProvider);
-                await seed.moveBusToNextStop();
-
-                if (!context.mounted) return;
-
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Bus location updated.')),
-                );
-              },
-              icon: const Icon(Icons.directions_bus_outlined),
-              label: const Text('Move Bus'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: ParentUiColors.orange,
-                side: const BorderSide(color: ParentUiColors.orange),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _DemoActionButton(
+                  icon: Icons.warning_amber_outlined,
+                  label: 'Delay',
+                  onPressed: () {
+                    _runSeedAction(
+                      context,
+                      ref,
+                      action: (seed) => seed.markTripDelayed(),
+                      successMessage: 'Trip marked as delayed.',
+                    );
+                  },
+                ),
               ),
-            ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _DemoActionButton(
+                  icon: Icons.check_circle_outline,
+                  label: 'Complete',
+                  onPressed: () {
+                    _runSeedAction(
+                      context,
+                      ref,
+                      action: (seed) => seed.markTripCompleted(),
+                      successMessage: 'Trip marked as completed.',
+                    );
+                  },
+                ),
+              ),
+            ],
           ),
         ],
+      ),
+    );
+  }
+
+  Future<void> _runSeedAction(
+    BuildContext context,
+    WidgetRef ref, {
+    required Future<void> Function(dynamic seed) action,
+    required String successMessage,
+  }) async {
+    final seed = ref.read(parentDemoTripSeedProvider);
+
+    await action(seed);
+
+    if (!context.mounted) return;
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(successMessage)));
+  }
+}
+
+class _DemoActionButton extends StatelessWidget {
+  const _DemoActionButton({
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+    this.isFilled = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onPressed;
+  final bool isFilled;
+
+  @override
+  Widget build(BuildContext context) {
+    if (isFilled) {
+      return ElevatedButton.icon(
+        onPressed: onPressed,
+        icon: Icon(icon),
+        label: Text(label),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: ParentUiColors.orange,
+          foregroundColor: Colors.white,
+        ),
+      );
+    }
+
+    return OutlinedButton.icon(
+      onPressed: onPressed,
+      icon: Icon(icon),
+      label: Text(label),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: ParentUiColors.orange,
+        side: const BorderSide(color: ParentUiColors.orange),
       ),
     );
   }

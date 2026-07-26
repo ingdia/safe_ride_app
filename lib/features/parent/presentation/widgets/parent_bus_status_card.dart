@@ -112,35 +112,73 @@ class _BusCardHeader extends StatelessWidget {
             ],
           ),
         ),
-        _StatusBadge(label: trip.statusLabel),
+        _StatusBadge(status: trip.status, label: trip.statusLabel),
       ],
     );
   }
 }
 
 class _StatusBadge extends StatelessWidget {
-  const _StatusBadge({required this.label});
+  const _StatusBadge({required this.status, required this.label});
 
+  final ParentTripStatus status;
   final String label;
 
   @override
   Widget build(BuildContext context) {
+    final colors = _statusColors(status);
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
-        color: Colors.green.withValues(alpha: 0.12),
+        color: colors.background,
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         label,
-        style: const TextStyle(
-          color: Colors.green,
+        style: TextStyle(
+          color: colors.foreground,
           fontWeight: FontWeight.w800,
           fontSize: 12,
         ),
       ),
     );
   }
+
+  _StatusBadgeColors _statusColors(ParentTripStatus status) {
+    switch (status) {
+      case ParentTripStatus.onTime:
+        return _StatusBadgeColors(
+          background: Colors.green.withValues(alpha: 0.12),
+          foreground: Colors.green,
+        );
+      case ParentTripStatus.delayed:
+        return _StatusBadgeColors(
+          background: Colors.orange.withValues(alpha: 0.14),
+          foreground: Colors.orange,
+        );
+      case ParentTripStatus.completed:
+        return _StatusBadgeColors(
+          background: Colors.blue.withValues(alpha: 0.12),
+          foreground: Colors.blue,
+        );
+      case ParentTripStatus.emergency:
+        return _StatusBadgeColors(
+          background: Colors.red.withValues(alpha: 0.12),
+          foreground: Colors.red,
+        );
+    }
+  }
+}
+
+class _StatusBadgeColors {
+  const _StatusBadgeColors({
+    required this.background,
+    required this.foreground,
+  });
+
+  final Color background;
+  final Color foreground;
 }
 
 class _LocationRow extends StatelessWidget {
