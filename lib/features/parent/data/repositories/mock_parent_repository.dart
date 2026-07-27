@@ -1,6 +1,8 @@
 import '../../domain/entities/parent_dashboard_entity.dart';
 import '../../domain/entities/parent_notification_entity.dart';
 import '../../domain/entities/parent_trip_entity.dart';
+import '../../domain/entities/parent_profile_entity.dart';
+import '../../domain/entities/parent_child_entity.dart';
 import 'parent_repository.dart';
 
 class MockParentRepository implements ParentRepository {
@@ -112,6 +114,11 @@ class MockParentRepository implements ParentRepository {
   }
 
   @override
+  Stream<ParentTripEntity> watchLiveTrip() async* {
+    yield await getLiveTrip();
+  }
+
+  @override
   Future<List<ParentNotificationEntity>> getNotifications() async {
     await Future<void>.delayed(const Duration(milliseconds: 300));
 
@@ -162,5 +169,74 @@ class MockParentRepository implements ParentRepository {
   @override
   Future<void> markNotificationAsRead(String notificationId) async {
     await Future<void>.delayed(const Duration(milliseconds: 200));
+  }
+
+  @override
+  Future<ParentProfileEntity> getParentProfile() async {
+    await Future<void>.delayed(const Duration(milliseconds: 250));
+
+    return const ParentProfileEntity(
+      parentId: 'parent_001',
+      fullName: 'Uwimana Claudine',
+      phoneNumber: '+250 788 000 111',
+      email: 'parent@saferide.rw',
+      homeAddress: 'Kacyiru, Kigali',
+      preferredLanguage: 'English',
+    );
+  }
+
+  @override
+  Stream<ParentProfileEntity> watchParentProfile() async* {
+    yield await getParentProfile();
+  }
+
+  @override
+  Future<void> updateParentProfile(ParentProfileEntity profile) async {
+    await Future<void>.delayed(const Duration(milliseconds: 250));
+  }
+
+  @override
+  Stream<List<ParentChildEntity>> watchChildren() async* {
+    yield const [
+      ParentChildEntity(
+        id: 'child_001',
+        fullName: 'Ineza Uwase',
+        grade: 'Primary 4',
+        busNumber: 'Bus #12',
+        pickupStop: 'Kacyiru',
+      ),
+      ParentChildEntity(
+        id: 'child_002',
+        fullName: 'Ganza Ntwali',
+        grade: 'Primary 1',
+        busNumber: 'Bus #12',
+        pickupStop: 'Gishushu',
+      ),
+    ];
+  }
+
+  @override
+  Future<void> addChild(ParentChildEntity child) async {
+    await Future<void>.delayed(const Duration(milliseconds: 250));
+  }
+
+  @override
+  Future<void> updateChild(ParentChildEntity child) async {
+    await Future<void>.delayed(const Duration(milliseconds: 250));
+  }
+
+  @override
+  Future<void> deleteChild(String childId) async {
+    await Future<void>.delayed(const Duration(milliseconds: 250));
+  }
+
+  @override
+  Stream<List<ParentNotificationEntity>> watchNotifications() async* {
+    yield await getNotifications();
+  }
+
+  @override
+  Future<void> markAllNotificationsAsRead() async {
+    await Future<void>.delayed(const Duration(milliseconds: 250));
   }
 }
