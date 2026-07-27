@@ -101,7 +101,7 @@ class _AppBottomNavBar extends StatelessWidget {
             vertical: ParentUiSpacing.sm,
           ),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: List.generate(
               items.length,
               (index) => _NavBarItem(

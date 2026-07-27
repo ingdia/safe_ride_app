@@ -6,7 +6,9 @@ import '../../../../shared/providers/attendance_cache_provider.dart';
 import '../../../../shared/providers/connectivity_provider.dart';
 import '../../data/datasources/attendance_cache_service.dart';
 import '../../data/models/cached_attendance_record.dart';
+import '../../data/repositories/firestore_driver_repository.dart';
 import '../../data/repositories/mock_driver_repository.dart';
+import '../../domain/repositories/driver_repository.dart';
 import '../../domain/models/student.dart';
 import 'driver_route_state.dart';
 
@@ -21,12 +23,20 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
   }
 
   Future<DriverRouteState> _loadRoute() async {
-    final repository = MockDriverRepository();
+    final DriverRepository repository = FirestoreDriverRepository();
     final cacheService = ref.read(attendanceCacheProvider);
 
     try {
-      final stops = await repository.fetchRouteStops();
-      final students = await repository.fetchRouteStudents();
+      var stops = await repository.fetchRouteStops();
+      var students = await repository.fetchRouteStudents();
+
+      // If Firestore returned no data (e.g. not configured on web), fallback
+      // to the local mock repository so the UI remains usable during dev.
+      if (stops.isEmpty && students.isEmpty) {
+        final mock = MockDriverRepository();
+        stops = await mock.fetchRouteStops();
+        students = await mock.fetchRouteStudents();
+      }
 
       final cached = cacheService.loadAll();
       final merged = students.map((student) {
@@ -74,7 +84,7 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
     final currentState = state.value;
     if (currentState is! DriverRouteLoaded) return;
 
-    final repository = MockDriverRepository();
+    final DriverRepository repository = FirestoreDriverRepository();
     final cacheService = ref.read(attendanceCacheProvider);
     final isOnline = ref.read(connectivityProvider).maybeWhen(
       data: (value) => value,
@@ -134,7 +144,7 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
   }
 
   Future<List<Student>> _syncPendingCachedAttendance({
-    required MockDriverRepository repository,
+    required DriverRepository repository,
     required List<Student> students,
     required AttendanceCacheService cacheService,
   }) async {

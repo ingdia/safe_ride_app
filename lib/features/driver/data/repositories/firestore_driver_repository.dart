@@ -15,75 +15,95 @@ class FirestoreDriverRepository implements DriverRepository {
 
   @override
   Future<List<RouteStop>> fetchRouteStops() async {
-    final query = await _firestore.collection(DriverFirestorePaths.routes).get();
+    try {
+      final query = await _firestore.collection(DriverFirestorePaths.routes).get();
 
-    final stops = query.docs.map((doc) {
-      final data = doc.data();
+      final stops = query.docs.map((doc) {
+        final data = doc.data();
 
-      // Support two shapes:
-      // 1) Each document represents a stop with top-level fields.
-      // 2) A route document contains a list field (e.g. `stops` or `routeStops`).
+        // Support two shapes:
+        // 1) Each document represents a stop with top-level fields.
+        // 2) A route document contains a list field (e.g. `stops` or `routeStops`).
 
-      if (data.containsKey('stops') && data['stops'] is List) {
-        final rawStops = data['stops'] as List;
-        return rawStops.map((s) => _mapRouteStopFromMap(s as Map<String, dynamic>)).toList();
-      }
+        if (data.containsKey('stops') && data['stops'] is List) {
+          final rawStops = data['stops'] as List;
+          return rawStops.map((s) => _mapRouteStopFromMap(s as Map<String, dynamic>)).toList();
+        }
 
-      return [_mapRouteStopFromMap(data)];
-    }).expand((e) => e).toList();
+        return [_mapRouteStopFromMap(data)];
+      }).expand((e) => e).toList();
 
-    // Ensure ordering by `order` field.
-    stops.sort((a, b) => a.order.compareTo(b.order));
+      // Ensure ordering by `order` field.
+      stops.sort((a, b) => a.order.compareTo(b.order));
 
-    return stops;
+      return stops;
+    } on FirebaseException catch (_) {
+      // Return an empty list if Firestore fails (e.g. on web interop issues).
+      return <RouteStop>[];
+    }
   }
 
   @override
   Future<List<Student>> fetchRouteStudents() async {
-    // Try to read a top-level `students` collection; if it doesn't exist return empty list.
-    final collectionRef = _firestore.collection('students');
-    final snapshot = await collectionRef.get();
+    try {
+      // Try to read a top-level `students` collection; if it doesn't exist return empty list.
+      final collectionRef = _firestore.collection('students');
+      final snapshot = await collectionRef.get();
 
-    final students = snapshot.docs.map((doc) => _mapStudentFromDoc(doc)).toList();
-    return students;
+      final students = snapshot.docs.map((doc) => _mapStudentFromDoc(doc)).toList();
+      return students;
+    } on FirebaseException catch (_) {
+      return <Student>[];
+    }
   }
 
   @override
   Future<Student> updateStudentAttendanceStatus(String studentId, AttendanceStatus status) async {
-    final attendanceRef = _firestore.collection(DriverFirestorePaths.attendance).doc();
+    try {
+      final attendanceRef = _firestore.collection(DriverFirestorePaths.attendance).doc();
 
-    final statusValue = _attendanceStatusToString(status);
+      final statusValue = _attendanceStatusToString(status);
 
-    final data = <String, dynamic>{
-      DriverFirestoreFields.attendanceId: attendanceRef.id,
-      DriverFirestoreFields.studentId: studentId,
-      DriverFirestoreFields.status: statusValue,
-      DriverFirestoreFields.timestamp: FieldValue.serverTimestamp(),
-      DriverFirestoreFields.recordedBy: 'driver_app',
-      DriverFirestoreFields.date: DateTime.now().toIso8601String(),
-    };
+      final data = <String, dynamic>{
+        DriverFirestoreFields.attendanceId: attendanceRef.id,
+        DriverFirestoreFields.studentId: studentId,
+        DriverFirestoreFields.status: statusValue,
+        DriverFirestoreFields.timestamp: FieldValue.serverTimestamp(),
+        DriverFirestoreFields.recordedBy: 'driver_app',
+        DriverFirestoreFields.date: DateTime.now().toIso8601String(),
+      };
 
-    await attendanceRef.set(data);
+      await attendanceRef.set(data);
 
-    // If a `students/{studentId}` document exists, update its status field to keep canonical state.
-    final studentDocRef = _firestore.collection('students').doc(studentId);
-    final studentSnapshot = await studentDocRef.get();
+      // If a `students/{studentId}` document exists, update its status field to keep canonical state.
+      final studentDocRef = _firestore.collection('students').doc(studentId);
+      final studentSnapshot = await studentDocRef.get();
 
-    if (studentSnapshot.exists) {
-      await studentDocRef.update({
-        'status': statusValue,
-      });
-      return _mapStudentFromDoc(await studentDocRef.get());
+      if (studentSnapshot.exists) {
+        await studentDocRef.update({
+          'status': statusValue,
+        });
+        return _mapStudentFromDoc(await studentDocRef.get());
+      }
+
+      // If student doc does not exist, return a lightweight Student instance with updated status.
+      return Student(
+        id: studentId,
+        name: '',
+        stopName: '',
+        grade: '',
+        status: status,
+      );
+    } on FirebaseException catch (_) {
+      // If Firestore fails, return a lightweight Student with the requested status so UI can continue.
+      return Student(
+        id: studentId,
+        name: '',
+        stopName: '',
+        grade: '',
+        status: status,
+      );
     }
-
-    // If student doc does not exist, return a lightweight Student instance with updated status.
-    return Student(
-      id: studentId,
-      name: '',
-      stopName: '',
-      grade: '',
-      status: status,
-    );
   }
 
   RouteStop _mapRouteStopFromMap(Map<String, dynamic> data) {
