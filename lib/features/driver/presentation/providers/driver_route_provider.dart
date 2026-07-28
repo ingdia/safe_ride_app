@@ -89,16 +89,19 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
   FutureOr<DriverRouteState> build() async {
     ref.listen<AsyncValue<bool>>(connectivityProvider, (previous, next) {
       final isOnline = next.maybeWhen(data: (value) => value, orElse: () => false);
+      _online = isOnline;
       if (isOnline) {
         _syncCachedAttendanceIfOnline();
       }
     });
 
-    _online = ref.watch(connectivityProvider).when(
-          data: (v) => v,
-          loading: () => true,
-          error: (_, __) => false,
-        );
+    _online = ref.read(connectivityProvider).when(
+      data: (v) => v,
+      loading: () => true,
+      error: (_, __) => false,
+    );
+
+    if (!ref.mounted) return const DriverRouteInitial();
     return _loadRoute(isOnline: _online);
   }
 
@@ -231,7 +234,11 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
       orElse: () => Student(id: studentId, name: '', stopName: '', grade: ''),
     );
     final cacheService = ref.read(attendanceCacheProvider);
-    final isOnline = _online;
+    final isOnline = ref.read(connectivityProvider).when(
+          data: (v) => v,
+          loading: () => _online,
+          error: (_, __) => false,
+        );
 
     state = const AsyncLoading<DriverRouteState>();
 

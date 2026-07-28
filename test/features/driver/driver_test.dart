@@ -21,7 +21,7 @@ void main() {
     ProviderContainer makeContainer({required bool isOnline}) => ProviderContainer(
           overrides: [
             attendanceCacheProvider.overrideWithValue(cache),
-            connectivityProvider.overrideWith((ref) => Stream.value(isOnline)),
+            connectivityProvider.overrideWithValue(AsyncData(isOnline)),
             driverRepositoryProvider.overrideWithValue(MockDriverRepository()),
           ],
         );
@@ -103,24 +103,21 @@ void main() {
     });
 
     test('reconnect syncs cached attendance when connectivity returns online', () async {
-      final connectivityStream = StreamController<bool>();
+      final connectivityController = StreamController<bool>.broadcast();
+      bool currentOnline = false;
       final container = ProviderContainer(
         overrides: [
           attendanceCacheProvider.overrideWithValue(cache),
-          connectivityProvider.overrideWith((ref) async* {
-            yield false;
-            yield* connectivityStream.stream;
-          }),
+          connectivityProvider.overrideWithValue(AsyncData(currentOnline)),
           driverRepositoryProvider.overrideWithValue(MockDriverRepository()),
         ],
       );
       addTearDown(() {
-        connectivityStream.close();
+        connectivityController.close();
         container.dispose();
       });
 
-      final loadFuture = container.read(driverRouteProvider.future);
-      await loadFuture;
+      await container.read(driverRouteProvider.future);
 
       await container.read(driverRouteProvider.notifier).updateStudentAttendanceStatus(
             studentId: 's1',
@@ -128,17 +125,12 @@ void main() {
           );
       expect((await cache.loadAll()).containsKey('s1'), isTrue);
 
-      final onlineCompleter = Completer<void>();
-      container.listen<AsyncValue<bool>>(connectivityProvider, (prev, next) {
-        if (next.when(data: (value) => value == true, loading: () => false, error: (_, __) => false)) {
-          if (!onlineCompleter.isCompleted) {
-            onlineCompleter.complete();
-          }
-        }
-      });
-
-      connectivityStream.add(true);
-      await onlineCompleter.future;
+      // Simulate coming back online by updating the override.
+      container.updateOverrides([
+        attendanceCacheProvider.overrideWithValue(cache),
+        connectivityProvider.overrideWithValue(const AsyncData(true)),
+        driverRepositoryProvider.overrideWithValue(MockDriverRepository()),
+      ]);
       await Future<void>.delayed(const Duration(milliseconds: 200));
 
       expect((await cache.loadAll()).containsKey('s1'), isFalse);
