@@ -13,6 +13,10 @@ import '../../domain/models/student.dart';
 import '../../domain/repositories/driver_repository.dart';
 import 'driver_route_state.dart';
 
+final driverRepositoryProvider = Provider<DriverRepository>(
+  (ref) => FirestoreDriverRepository(),
+);
+
 final driverRouteProvider = AsyncNotifierProvider<DriverRouteNotifier, DriverRouteState>(
   DriverRouteNotifier.new,
 );
@@ -24,23 +28,90 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
 
   @override
   FutureOr<DriverRouteState> build() async {
-    return _loadRoute();
+    ref.listen<AsyncValue<bool>>(connectivityProvider, (previous, next) {
+      final isOnline = next.maybeWhen(data: (value) => value, orElse: () => false);
+      if (isOnline) {
+        _syncCachedAttendanceIfOnline();
+      }
+    });
+
+    final isOnline = ref.watch(connectivityProvider).when(
+          data: (value) => value,
+          loading: () => true,
+          error: (_, __) => false,
+        );
+    return _loadRoute(isOnline: isOnline);
   }
 
-  Future<DriverRouteState> _loadRoute() async {
+  bool _isOnline() {
+    return ref.read(connectivityProvider).when(
+          data: (value) => value,
+          loading: () => true,
+          error: (_, __) => false,
+        );
+  }
+
+  DriverRepository _repositoryForConnectivity(bool isOnline) {
+    if (!isOnline) {
+      return MockDriverRepository();
+    }
+
+    return ref.read(driverRepositoryProvider);
+  }
+
+  Future<void> _syncCachedAttendanceIfOnline() async {
+    final currentState = state.value;
+    if (currentState is! DriverRouteLoaded) return;
+
+    final isOnline = _isOnline();
+    if (!isOnline) return;
+
+    _repository = _repositoryForConnectivity(isOnline);
+
     final cacheService = ref.read(attendanceCacheProvider);
-    final firestoreRepository = FirestoreDriverRepository();
-    _repository = firestoreRepository;
+    final syncedStudents = await _syncPendingCachedAttendance(
+      repository: _repository,
+      students: currentState.students,
+      cacheService: cacheService,
+    );
+
+    final boardedCount = syncedStudents
+        .where((student) => student.status == AttendanceStatus.boarded)
+        .length;
+    final progress = syncedStudents.isEmpty
+        ? 0.0
+        : boardedCount / syncedStudents.length;
+
+    state = AsyncData(
+      DriverRouteLoaded(
+        stops: currentState.stops,
+        students: syncedStudents,
+        routeProgress: progress,
+        gpsStatus: _gpsStatusFor(
+          progress: progress,
+          lastGpsUpdateAt: currentState.lastGpsUpdateAt,
+        ),
+        lastGpsUpdateAt: currentState.lastGpsUpdateAt,
+      ),
+    );
+  }
+
+  Future<DriverRouteState> _loadRoute({required bool isOnline}) async {
+    final cacheService = ref.read(attendanceCacheProvider);
+    final repository = _repositoryForConnectivity(isOnline);
+    _repository = repository;
 
     List<RouteStop> stops = <RouteStop>[];
     List<Student> students = <Student>[];
 
-    try {
-      stops = await firestoreRepository.fetchRouteStops();
-      students = await firestoreRepository.fetchRouteStudents();
-    } catch (_) {
-      stops = <RouteStop>[];
-      students = <Student>[];
+    if (isOnline) {
+      try {
+        stops = await repository.fetchRouteStops();
+        students = await repository.fetchRouteStudents();
+      } catch (_) {
+        stops = <RouteStop>[];
+        students = <Student>[];
+      }
     }
 
     if (stops.isEmpty || students.isEmpty) {
@@ -52,8 +123,8 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
       } catch (error) {
         return DriverRouteError(message: error.toString());
       }
-    } else {
-      final metadata = await firestoreRepository.fetchRouteMetadata();
+    } else if (_repository is FirestoreDriverRepository) {
+      final metadata = await (_repository as FirestoreDriverRepository).fetchRouteMetadata();
       _routeId = metadata['routeId'];
       _busId = metadata['busId'];
     }
@@ -89,7 +160,8 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
   }
 
   Future<void> loadRoute() async {
-    state = await AsyncValue.guard(() => _loadRoute());
+    final isOnline = await ref.watch(connectivityProvider.future);
+    state = await AsyncValue.guard(() => _loadRoute(isOnline: isOnline));
   }
 
   Future<void> updateStudentAttendanceStatus({
@@ -103,23 +175,43 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
       (student) => student.id == studentId,
       orElse: () => Student(id: studentId, name: '', stopName: '', grade: ''),
     );
-    final repository = _repository;
     final cacheService = ref.read(attendanceCacheProvider);
     final isOnline = ref.read(connectivityProvider).maybeWhen(
           data: (value) => value,
-          orElse: () => true,
+          orElse: () => false,
         );
+
+    if (isOnline) {
+      _repository = _repositoryForConnectivity(isOnline);
+    }
 
     state = const AsyncLoading<DriverRouteState>();
 
     late Student updatedStudent;
     if (status == AttendanceStatus.notBoarded) {
       updatedStudent = currentStudent.copyWith(status: status);
-      if (isOnline) {
-        await cacheService.deleteRecord(studentId);
-      }
+      await cacheService.deleteRecord(studentId);
+    } else if (!isOnline) {
+      _repository = MockDriverRepository();
+      updatedStudent = await _repository.updateStudentAttendanceStatus(
+        studentId,
+        status,
+        routeId: '',
+        busId: '',
+      );
+      await cacheService.saveRecord(
+        CachedAttendanceRecord(
+          studentId: updatedStudent.id,
+          studentName: updatedStudent.name,
+          stopName: updatedStudent.stopName,
+          statusIndex: updatedStudent.status.index,
+          recordedAt: DateTime.now(),
+          synced: false,
+        ),
+      );
     } else {
       try {
+        final repository = _repository;
         updatedStudent = await repository
             .updateStudentAttendanceStatus(
               studentId,
@@ -129,37 +221,15 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
             )
             .timeout(const Duration(seconds: 8));
       } catch (_) {
-        if (repository is! MockDriverRepository) {
-          _repository = MockDriverRepository();
-          updatedStudent = await _repository.updateStudentAttendanceStatus(
-            studentId,
-            status,
-            routeId: '',
-            busId: '',
-          );
-        } else {
-          state = AsyncError(
-            DriverRouteError(message: 'Unable to update attendance.'),
-            StackTrace.current,
-          );
-          return;
-        }
-      }
-
-      if (!isOnline) {
-        await cacheService.saveRecord(
-          CachedAttendanceRecord(
-            studentId: updatedStudent.id,
-            studentName: updatedStudent.name,
-            stopName: updatedStudent.stopName,
-            statusIndex: updatedStudent.status.index,
-            recordedAt: DateTime.now(),
-            synced: false,
-          ),
+        _repository = MockDriverRepository();
+        updatedStudent = await _repository.updateStudentAttendanceStatus(
+          studentId,
+          status,
+          routeId: '',
+          busId: '',
         );
-      } else {
-        await cacheService.deleteRecord(updatedStudent.id);
       }
+      await cacheService.deleteRecord(updatedStudent.id);
     }
 
     final updatedStudents = currentState.students
@@ -227,10 +297,7 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
     required List<Student> students,
     required AttendanceCacheService cacheService,
   }) async {
-    final isOnline = ref.read(connectivityProvider).maybeWhen(
-      data: (value) => value,
-      orElse: () => true,
-    );
+    final isOnline = _isOnline();
     if (!isOnline) return students;
 
     final cached = cacheService.loadAll();
