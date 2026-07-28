@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../shared/providers/attendance_cache_provider.dart';
 import '../../../../shared/providers/connectivity_provider.dart';
-import '../../data/datasources/attendance_cache_service.dart';
 import '../../data/datasources/driver_stream_service.dart';
 import '../../data/models/cached_attendance_record.dart';
 import '../../data/models/driver_alert.dart';
@@ -118,30 +117,30 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
   Future<void> _syncCachedAttendanceIfOnline() async {
     final currentState = state.value;
     if (currentState is! DriverRouteLoaded) return;
-
-    final isOnline = _isOnline();
-    if (!isOnline) return;
-
-    _repository = _repositoryForConnectivity(isOnline);
+    if (!_isOnline()) return;
 
     final cacheService = ref.read(attendanceCacheProvider);
-    final syncedStudents = await _syncPendingCachedAttendance(
-      repository: _repository,
-      students: currentState.students,
-      cacheService: cacheService,
-    );
 
-    final boardedCount = syncedStudents
-        .where((student) => student.status == AttendanceStatus.boarded)
+    // Batch-push all unsynced records to Firestore and delete them from cache.
+    await cacheService.syncOfflineData();
+
+    // Merge any remaining cache entries (e.g. written mid-sync) into state.
+    final remaining = await cacheService.loadAll();
+    final mergedStudents = currentState.students.map((s) {
+      final record = remaining[s.id];
+      return record == null ? s : s.copyWith(status: AttendanceStatus.values[record.statusIndex]);
+    }).toList();
+
+    final boardedCount = mergedStudents
+        .where((s) => s.status == AttendanceStatus.boarded)
         .length;
-    final progress = syncedStudents.isEmpty
-        ? 0.0
-        : boardedCount / syncedStudents.length;
+    final progress =
+        mergedStudents.isEmpty ? 0.0 : boardedCount / mergedStudents.length;
 
     state = AsyncData(
       DriverRouteLoaded(
         stops: currentState.stops,
-        students: syncedStudents,
+        students: mergedStudents,
         routeId: _routeId,
         routeProgress: progress,
         gpsStatus: _gpsStatusFor(
@@ -195,11 +194,15 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
       );
     }).toList();
 
-    final syncedStudents = await _syncPendingCachedAttendance(
-      repository: _repository,
-      students: merged,
-      cacheService: cacheService,
-    );
+    // If online, push any pending cached records to Firestore now.
+    if (isOnline) await cacheService.syncOfflineData();
+
+    // Re-read cache after sync (entries written mid-sync survive).
+    final postSync = await cacheService.loadAll();
+    final syncedStudents = merged.map((s) {
+      final record = postSync[s.id];
+      return record == null ? s : s.copyWith(status: AttendanceStatus.values[record.statusIndex]);
+    }).toList();
 
     final boardedCount = syncedStudents
         .where((student) => student.status == AttendanceStatus.boarded)
@@ -349,39 +352,6 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
         StackTrace.current,
       );
     }
-  }
-  Future<List<Student>> _syncPendingCachedAttendance({
-    required DriverRepository repository,
-    required List<Student> students,
-    required AttendanceCacheService cacheService,
-  }) async {
-    final isOnline = _isOnline();
-    if (!isOnline) return students;
-
-    final cached = await cacheService.loadAll();
-    if (cached.isEmpty) return students;
-
-    final syncedStudents = List<Student>.from(students);
-    for (final record in cached.values) {
-      final status = AttendanceStatus.values[record.statusIndex];
-      try {
-        final updatedStudent = await repository.updateStudentAttendanceStatus(
-          record.studentId,
-          status,
-          routeId: _routeId,
-          busId: _busId,
-        );
-        final index = syncedStudents.indexWhere((student) => student.id == updatedStudent.id);
-        if (index != -1) {
-          syncedStudents[index] = updatedStudent;
-        }
-        await cacheService.deleteRecord(record.studentId);
-      } catch (_) {
-        continue;
-      }
-    }
-
-    return syncedStudents;
   }
 
   String _gpsStatusFor({

@@ -24,5 +24,7 @@ class FakeAttendanceCacheService implements AttendanceCacheService {
   Future<void> clearAll() async => _store.clear();
 
   @override
-  Future<void> syncOfflineData([FirebaseFirestore? firestore]) async {}
+  Future<void> syncOfflineData([FirebaseFirestore? firestore]) async {
+    _store.removeWhere((_, r) => !r.synced);
+  }
 }

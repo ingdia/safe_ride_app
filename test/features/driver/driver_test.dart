@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:safe_ride_app/features/driver/data/models/cached_attendance_record.dart';
@@ -11,6 +12,17 @@ import 'package:safe_ride_app/shared/providers/attendance_cache_provider.dart';
 import 'package:safe_ride_app/shared/providers/connectivity_provider.dart';
 
 import '../../helpers/fake_attendance_cache_service.dart';
+
+/// Spy that records how many times [syncOfflineData] was called.
+class _SpyCacheService extends FakeAttendanceCacheService {
+  int syncCallCount = 0;
+
+  @override
+  Future<void> syncOfflineData([FirebaseFirestore? firestore]) async {
+    syncCallCount++;
+    await super.syncOfflineData(firestore);
+  }
+}
 
 void main() {
   group('DriverRouteProvider', () {
@@ -137,10 +149,35 @@ void main() {
       final loaded = container.read(driverRouteProvider).value as DriverRouteLoaded;
       expect(loaded.students.firstWhere((s) => s.id == 's1').status, AttendanceStatus.boarded);
     });
+    test('reconnect calls syncOfflineData exactly once', () async {
+      final spy = _SpyCacheService();
+      await spy.saveRecord(_makeRecord('s1', AttendanceStatus.boarded));
+
+      final container = ProviderContainer(
+        overrides: [
+          attendanceCacheProvider.overrideWithValue(spy),
+          connectivityProvider.overrideWithValue(const AsyncData(false)),
+          driverRepositoryProvider.overrideWithValue(MockDriverRepository()),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container.read(driverRouteProvider.future);
+      final syncCountAfterLoad = spy.syncCallCount;
+
+      container.updateOverrides([
+        attendanceCacheProvider.overrideWithValue(spy),
+        connectivityProvider.overrideWithValue(const AsyncData(true)),
+        driverRepositoryProvider.overrideWithValue(MockDriverRepository()),
+      ]);
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+
+      expect(spy.syncCallCount, syncCountAfterLoad + 1);
+    });
+
   });
 
-  group('MockDriverRepository', () {
-    test('returns expected sample data', () async {
+  group('MockDriverRepository', () {    test('returns expected sample data', () async {
       final repository = MockDriverRepository();
 
       final stops = await repository.fetchRouteStops();
