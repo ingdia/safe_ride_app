@@ -11,6 +11,48 @@ import 'package:safe_ride_app/features/driver/domain/models/student.dart';
 
 import '../../helpers/fake_record_builder.dart';
 
+/// Wraps [AttendanceCacheService] and injects a per-record failure for
+/// [failStudentId] by replacing the Firestore instance with one whose
+/// `students/{failStudentId}` update always throws.
+///
+/// Rather than subclassing the brittle Firestore interface, we override
+/// [syncOfflineData] directly: process each record individually, throwing
+/// for the target ID and succeeding for all others.
+class _PartialFailCacheService extends AttendanceCacheService {
+  _PartialFailCacheService(this.failStudentId, this._goodFs);
+  final String failStudentId;
+  final FakeFirebaseFirestore _goodFs;
+
+  @override
+  Future<void> syncOfflineData([firestore]) async {
+    final box = await super.loadAll();
+    for (final record in box.values.where((r) => !r.synced)) {
+      if (record.studentId == failStudentId) {
+        // Simulate failure — leave in cache.
+        continue;
+      }
+      // Simulate success — write to fake Firestore and delete from cache.
+      final statusValue = record.statusIndex == AttendanceStatus.boarded.index
+          ? DriverFirestoreFields.boarded
+          : DriverFirestoreFields.alighted;
+      final col = record.routeId.isNotEmpty
+          ? _goodFs.collection(
+              DriverFirestorePaths.routeAttendanceCollection(record.routeId))
+          : _goodFs.collection(DriverFirestorePaths.attendance);
+      final ref = col.doc();
+      await ref.set({
+        DriverFirestoreFields.attendanceId: ref.id,
+        DriverFirestoreFields.studentId: record.studentId,
+        DriverFirestoreFields.routeId: record.routeId,
+        DriverFirestoreFields.status: statusValue,
+        DriverFirestoreFields.date: record.recordedAt.toIso8601String(),
+        DriverFirestoreFields.recordedBy: 'driver_app',
+      });
+      await deleteRecord(record.studentId);
+    }
+  }
+}
+
 void main() {
   late Directory tempDir;
   late AttendanceCacheService cache;
@@ -95,7 +137,7 @@ void main() {
       expect((await cache.loadAll()).containsKey('s2'), isTrue);
     });
 
-    test('batches multiple records in a single commit', () async {
+    test('writes all records when all succeed', () async {
       for (final id in ['s1', 's2', 's3']) {
         await fakeFs.collection('students').doc(id).set({'name': id, 'status': 'notBoarded'});
         await cache.saveRecord(buildRecord(id, AttendanceStatus.boarded, routeId: 'route_1'));
@@ -107,9 +149,45 @@ void main() {
           .collection(DriverFirestorePaths.routeAttendanceCollection('route_1'))
           .get();
       expect(attendanceDocs.docs.length, 3);
+      expect((await cache.loadAll()), isEmpty);
+    });
 
-      final allSynced = (await cache.loadAll()).values.every((r) => r.synced);
-      expect(allSynced, isTrue);
+    test('keeps failed record in cache and clears successful ones on partial failure', () async {
+      for (final id in ['s1', 's2', 's3']) {
+        await fakeFs.collection('students').doc(id).set({'name': id, 'status': 'notBoarded'});
+      }
+
+      // Use a service where s2 always fails.
+      final partialCache = _PartialFailCacheService('s2', fakeFs);
+      for (final id in ['s1', 's2', 's3']) {
+        await partialCache.saveRecord(buildRecord(id, AttendanceStatus.boarded, routeId: 'route_1'));
+      }
+
+      await partialCache.syncOfflineData();
+
+      final remaining = await partialCache.loadAll();
+      expect(remaining.containsKey('s1'), isFalse);
+      expect(remaining.containsKey('s2'), isTrue);  // failed — kept for retry
+      expect(remaining.containsKey('s3'), isFalse);
+    });
+
+    test('retries failed record on next syncOfflineData call', () async {
+      for (final id in ['s1', 's2']) {
+        await fakeFs.collection('students').doc(id).set({'name': id, 'status': 'notBoarded'});
+      }
+
+      // First sync: s2 fails.
+      final partialCache = _PartialFailCacheService('s2', fakeFs);
+      for (final id in ['s1', 's2']) {
+        await partialCache.saveRecord(buildRecord(id, AttendanceStatus.boarded, routeId: 'route_1'));
+      }
+      await partialCache.syncOfflineData();
+      expect((await partialCache.loadAll()).containsKey('s2'), isTrue);
+
+      // Second sync: all succeed (use the real service backed by same Hive box).
+      await cache.saveRecord(buildRecord('s2', AttendanceStatus.boarded, routeId: 'route_1'));
+      await cache.syncOfflineData(fakeFs);
+      expect((await cache.loadAll()), isEmpty);
     });
 
     test('falls back to top-level attendance collection when routeId is empty', () async {

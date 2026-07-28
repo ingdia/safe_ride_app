@@ -46,16 +46,17 @@ class AttendanceCacheService {
     await box.clear();
   }
 
-  /// Pushes all unsynced cached records to Firestore in a single [WriteBatch].
+  /// Pushes all unsynced cached records to Firestore one record at a time.
   ///
-  /// Each record produces two operations in the batch:
+  /// Each record produces two sequential writes:
   /// 1. A new document in `routes/{routeId}/attendance/{auto-id}` (falls back
   ///    to the top-level `attendance` collection when [routeId] is empty).
   /// 2. A `status` field update on `students/{studentId}`.
   ///
-  /// On a successful commit every synced record is marked `synced: true` in
-  /// the Hive box. Throws if the Firestore commit fails so the caller can
-  /// decide whether to retry.
+  /// Records are written individually so a failure on one (e.g. a network drop
+  /// mid-sync) does not prevent the others from being committed. Only records
+  /// whose writes succeed are removed from the cache; failed records remain and
+  /// will be retried on the next call.
   Future<void> syncOfflineData([FirebaseFirestore? firestore]) async {
     final fs = firestore ?? FirebaseFirestore.instance;
     final box = await _ensureBox();
@@ -66,39 +67,38 @@ class AttendanceCacheService {
 
     if (unsynced.isEmpty) return;
 
-    final batch = fs.batch();
-
     for (final record in unsynced) {
       final statusValue = record.statusIndex == AttendanceStatus.boarded.index
           ? DriverFirestoreFields.boarded
           : DriverFirestoreFields.alighted;
 
-      // Attendance subcollection write.
-      final attendanceCollection = record.routeId.isNotEmpty
-          ? fs.collection(DriverFirestorePaths.routeAttendanceCollection(record.routeId))
-          : fs.collection(DriverFirestorePaths.attendance);
-      final attendanceRef = attendanceCollection.doc();
-      batch.set(attendanceRef, {
-        DriverFirestoreFields.attendanceId: attendanceRef.id,
-        DriverFirestoreFields.studentId: record.studentId,
-        DriverFirestoreFields.routeId: record.routeId,
-        DriverFirestoreFields.status: statusValue,
-        DriverFirestoreFields.date: record.recordedAt.toIso8601String(),
-        DriverFirestoreFields.timestamp: FieldValue.serverTimestamp(),
-        DriverFirestoreFields.recordedBy: 'driver_app',
-      });
+      try {
+        final attendanceCollection = record.routeId.isNotEmpty
+            ? fs.collection(DriverFirestorePaths.routeAttendanceCollection(record.routeId))
+            : fs.collection(DriverFirestorePaths.attendance);
+        final attendanceRef = attendanceCollection.doc();
 
-      // Canonical student document status update.
-      final studentRef = fs.collection('students').doc(record.studentId);
-      batch.update(studentRef, {DriverFirestoreFields.status: statusValue});
-    }
+        await attendanceRef.set({
+          DriverFirestoreFields.attendanceId: attendanceRef.id,
+          DriverFirestoreFields.studentId: record.studentId,
+          DriverFirestoreFields.routeId: record.routeId,
+          DriverFirestoreFields.status: statusValue,
+          DriverFirestoreFields.date: record.recordedAt.toIso8601String(),
+          DriverFirestoreFields.timestamp: FieldValue.serverTimestamp(),
+          DriverFirestoreFields.recordedBy: 'driver_app',
+        });
 
-    await batch.commit();
+        await fs
+            .collection('students')
+            .doc(record.studentId)
+            .update({DriverFirestoreFields.status: statusValue});
 
-    // Delete only the records that were part of this batch. Any new offline
-    // entries written to the box during the commit are left untouched.
-    for (final record in unsynced) {
-      await box.delete(record.studentId);
+        // Both writes succeeded — safe to remove from cache.
+        await box.delete(record.studentId);
+      } catch (_) {
+        // This record failed; leave it in the cache for the next retry.
+        continue;
+      }
     }
   }
 }
