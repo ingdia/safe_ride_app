@@ -8,8 +8,7 @@
 /// Firestore schema overview:
 /// ```
 /// routes/{routeId}
-///   ├── attendance/{attendanceId}   ← per-trip attendance records
-///   └── alerts/{alertId}           ← Admin-sent alerts scoped to this route
+///   └── attendance/{attendanceId}   ← per-trip attendance records
 ///
 /// buses/{busId}                     ← live GPS location (merged on every update)
 ///
@@ -52,14 +51,6 @@ class DriverFirestorePaths {
   /// [FirestoreDriverRepository.updateStudentAttendanceStatus].
   static String routeAttendanceCollection(String routeId) =>
       '$routes/$routeId/$attendance';
-
-  /// Path to the alerts **subcollection** scoped to a route:
-  /// `routes/{routeId}/alerts`.
-  ///
-  /// Each document is an Admin-sent alert targeting drivers on this route.
-  /// Consumed by [DriverStreamService.alertsStream].
-  static String driverAlertsCollection(String routeId) =>
-      '$routes/$routeId/alerts';
 
   /// Path to a specific attendance record:
   /// `routes/{routeId}/attendance/{attendanceId}`.
