@@ -183,8 +183,8 @@ class _StudentListItem extends StatelessWidget {
               ),
             ),
             const SizedBox(width: AppSpacing.sm),
-            SizedBox(
-              width: 200,
+            Flexible(
+              fit: FlexFit.loose,
               child: Wrap(
                 alignment: WrapAlignment.end,
                 spacing: AppSpacing.xs,

@@ -1,8 +1,10 @@
 import 'dart:async';
 
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'core/firebase/firebase_options.dart';
 import 'core/routing/app_router.dart';
 import 'core/storage/hive_boxes.dart';
 import 'features/parent/presentation/widgets/parent_ui_constants.dart';
@@ -10,6 +12,15 @@ import 'features/parent/presentation/widgets/parent_ui_constants.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initHive();
+
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } catch (error) {
+    debugPrint('Firebase initialization failed: $error');
+  }
+
   runApp(const ProviderScope(child: SafeRideApp()));
 }
 
