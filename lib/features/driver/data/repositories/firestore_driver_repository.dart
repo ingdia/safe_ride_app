@@ -37,8 +37,8 @@ class FirestoreDriverRepository implements DriverRepository {
       stops.sort((a, b) => a.order.compareTo(b.order));
 
       return stops;
-    } on FirebaseException catch (_) {
-      // Return an empty list if Firestore fails (e.g. on web interop issues).
+    } catch (_) {
+      // Return an empty list if Firestore fails (including web JS interop issues).
       return <RouteStop>[];
     }
   }
@@ -52,13 +52,18 @@ class FirestoreDriverRepository implements DriverRepository {
 
       final students = snapshot.docs.map((doc) => _mapStudentFromDoc(doc)).toList();
       return students;
-    } on FirebaseException catch (_) {
+    } catch (_) {
       return <Student>[];
     }
   }
 
   @override
-  Future<Student> updateStudentAttendanceStatus(String studentId, AttendanceStatus status) async {
+  Future<Student> updateStudentAttendanceStatus(
+    String studentId,
+    AttendanceStatus status, {
+    String? routeId,
+    String? busId,
+  }) async {
     try {
       final attendanceRef = _firestore.collection(DriverFirestorePaths.attendance).doc();
 
@@ -71,6 +76,8 @@ class FirestoreDriverRepository implements DriverRepository {
         DriverFirestoreFields.timestamp: FieldValue.serverTimestamp(),
         DriverFirestoreFields.recordedBy: 'driver_app',
         DriverFirestoreFields.date: DateTime.now().toIso8601String(),
+        DriverFirestoreFields.routeId: routeId ?? '',
+        DriverFirestoreFields.busId: busId ?? '',
       };
 
       await attendanceRef.set(data);
@@ -94,7 +101,7 @@ class FirestoreDriverRepository implements DriverRepository {
         grade: '',
         status: status,
       );
-    } on FirebaseException catch (_) {
+    } catch (_) {
       // If Firestore fails, return a lightweight Student with the requested status so UI can continue.
       return Student(
         id: studentId,

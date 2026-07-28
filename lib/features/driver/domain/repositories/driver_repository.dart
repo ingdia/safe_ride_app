@@ -12,6 +12,8 @@ abstract class DriverRepository {
   /// Updates a student's attendance status.
   Future<Student> updateStudentAttendanceStatus(
     String studentId,
-    AttendanceStatus status,
-  );
+    AttendanceStatus status, {
+    String? routeId,
+    String? busId,
+  });
 }

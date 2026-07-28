@@ -93,8 +93,10 @@ class MockDriverRepository implements DriverRepository {
   @override
   Future<Student> updateStudentAttendanceStatus(
     String studentId,
-    AttendanceStatus status,
-  ) async {
+    AttendanceStatus status, {
+    String? routeId,
+    String? busId,
+  }) async {
     final index = _students.indexWhere((student) => student.id == studentId);
     if (index == -1) {
       throw StateError('Student not found: $studentId');
