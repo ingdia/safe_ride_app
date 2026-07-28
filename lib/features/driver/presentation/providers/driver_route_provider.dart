@@ -19,6 +19,8 @@ final driverRouteProvider = AsyncNotifierProvider<DriverRouteNotifier, DriverRou
 
 class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
   late DriverRepository _repository;
+  String? _routeId;
+  String? _busId;
 
   @override
   FutureOr<DriverRouteState> build() async {
@@ -50,6 +52,10 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
       } catch (error) {
         return DriverRouteError(message: error.toString());
       }
+    } else {
+      final metadata = await firestoreRepository.fetchRouteMetadata();
+      _routeId = metadata['routeId'];
+      _busId = metadata['busId'];
     }
 
     final cached = cacheService.loadAll();
@@ -95,6 +101,10 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
     final currentState = state.value;
     if (currentState is! DriverRouteLoaded) return;
 
+    final currentStudent = currentState.students.firstWhere(
+      (student) => student.id == studentId,
+      orElse: () => Student(id: studentId, name: '', stopName: '', grade: ''),
+    );
     final repository = _repository;
     final cacheService = ref.read(attendanceCacheProvider);
     final isOnline = ref.read(connectivityProvider).maybeWhen(
@@ -105,46 +115,53 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
     state = const AsyncLoading<DriverRouteState>();
 
     late Student updatedStudent;
-    try {
-      updatedStudent = await repository
-          .updateStudentAttendanceStatus(
+    if (status == AttendanceStatus.notBoarded) {
+      updatedStudent = currentStudent.copyWith(status: status);
+      if (isOnline) {
+        await cacheService.deleteRecord(studentId);
+      }
+    } else {
+      try {
+        updatedStudent = await repository
+            .updateStudentAttendanceStatus(
+              studentId,
+              status,
+              routeId: _routeId,
+              busId: _busId,
+            )
+            .timeout(const Duration(seconds: 8));
+      } catch (_) {
+        if (repository is! MockDriverRepository) {
+          _repository = MockDriverRepository();
+          updatedStudent = await _repository.updateStudentAttendanceStatus(
             studentId,
             status,
             routeId: '',
             busId: '',
-          )
-          .timeout(const Duration(seconds: 8));
-    } catch (_) {
-      if (repository is! MockDriverRepository) {
-        _repository = MockDriverRepository();
-        updatedStudent = await _repository.updateStudentAttendanceStatus(
-          studentId,
-          status,
-          routeId: '',
-          busId: '',
+          );
+        } else {
+          state = AsyncError(
+            DriverRouteError(message: 'Unable to update attendance.'),
+            StackTrace.current,
+          );
+          return;
+        }
+      }
+
+      if (!isOnline) {
+        await cacheService.saveRecord(
+          CachedAttendanceRecord(
+            studentId: updatedStudent.id,
+            studentName: updatedStudent.name,
+            stopName: updatedStudent.stopName,
+            statusIndex: updatedStudent.status.index,
+            recordedAt: DateTime.now(),
+            synced: false,
+          ),
         );
       } else {
-        state = AsyncError(
-          DriverRouteError(message: 'Unable to update attendance.'),
-          StackTrace.current,
-        );
-        return;
+        await cacheService.deleteRecord(updatedStudent.id);
       }
-    }
-
-    if (!isOnline) {
-      await cacheService.saveRecord(
-        CachedAttendanceRecord(
-          studentId: updatedStudent.id,
-          studentName: updatedStudent.name,
-          stopName: updatedStudent.stopName,
-          statusIndex: updatedStudent.status.index,
-          recordedAt: DateTime.now(),
-          synced: false,
-        ),
-      );
-    } else {
-      await cacheService.deleteRecord(updatedStudent.id);
     }
 
     final updatedStudents = currentState.students
@@ -191,8 +208,8 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
         final updatedStudent = await repository.updateStudentAttendanceStatus(
           record.studentId,
           status,
-          routeId: '',
-          busId: '',
+          routeId: _routeId,
+          busId: _busId,
         );
         final index = syncedStudents.indexWhere((student) => student.id == updatedStudent.id);
         if (index != -1) {

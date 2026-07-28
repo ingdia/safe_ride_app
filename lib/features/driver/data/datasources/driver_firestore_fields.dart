@@ -13,7 +13,7 @@ class DriverFirestoreFields {
 
   // Attendance status values.
   static const String boarded = 'boarded';
-  static const String dropped = 'dropped';
+  static const String alighted = 'alighted';
   static const String absent = 'absent';
 
   // Bus GPS update fields.

@@ -13,6 +13,25 @@ class FirestoreDriverRepository implements DriverRepository {
 
   final FirebaseFirestore _firestore;
 
+  Future<Map<String, String?>> fetchRouteMetadata() async {
+    try {
+      final query = await _firestore
+          .collection(DriverFirestorePaths.routes)
+          .limit(1)
+          .get();
+
+      if (query.docs.isEmpty) return {};
+      final doc = query.docs.first;
+      final data = doc.data();
+      return {
+        'routeId': doc.id,
+        'busId': data['busId'] as String?,
+      };
+    } catch (_) {
+      return {};
+    }
+  }
+
   @override
   Future<List<RouteStop>> fetchRouteStops() async {
     try {
@@ -64,10 +83,28 @@ class FirestoreDriverRepository implements DriverRepository {
     String? routeId,
     String? busId,
   }) async {
-    try {
-      final attendanceRef = _firestore.collection(DriverFirestorePaths.attendance).doc();
+    if (status == AttendanceStatus.notBoarded) {
+      return Student(
+        id: studentId,
+        name: '',
+        stopName: '',
+        grade: '',
+        status: status,
+      );
+    }
 
-      final statusValue = _attendanceStatusToString(status);
+    final statusValue = _attendanceStatusToString(status);
+    final metadata = (routeId != null && routeId.isNotEmpty)
+        ? {'routeId': routeId, 'busId': busId}
+        : await fetchRouteMetadata();
+    final resolvedRouteId = metadata['routeId'] ?? '';
+    final resolvedBusId = metadata['busId'] ?? '';
+
+    try {
+      final collection = resolvedRouteId.isNotEmpty
+          ? _firestore.collection(DriverFirestorePaths.routeAttendanceCollection(resolvedRouteId))
+          : _firestore.collection(DriverFirestorePaths.attendance);
+      final attendanceRef = collection.doc();
 
       final data = <String, dynamic>{
         DriverFirestoreFields.attendanceId: attendanceRef.id,
@@ -76,8 +113,8 @@ class FirestoreDriverRepository implements DriverRepository {
         DriverFirestoreFields.timestamp: FieldValue.serverTimestamp(),
         DriverFirestoreFields.recordedBy: 'driver_app',
         DriverFirestoreFields.date: DateTime.now().toIso8601String(),
-        DriverFirestoreFields.routeId: routeId ?? '',
-        DriverFirestoreFields.busId: busId ?? '',
+        DriverFirestoreFields.routeId: resolvedRouteId,
+        DriverFirestoreFields.busId: resolvedBusId,
       };
 
       await attendanceRef.set(data);
@@ -93,7 +130,6 @@ class FirestoreDriverRepository implements DriverRepository {
         return _mapStudentFromDoc(await studentDocRef.get());
       }
 
-      // If student doc does not exist, return a lightweight Student instance with updated status.
       return Student(
         id: studentId,
         name: '',
@@ -102,7 +138,6 @@ class FirestoreDriverRepository implements DriverRepository {
         status: status,
       );
     } catch (_) {
-      // If Firestore fails, return a lightweight Student with the requested status so UI can continue.
       return Student(
         id: studentId,
         name: '',
@@ -163,6 +198,7 @@ class FirestoreDriverRepository implements DriverRepository {
     switch (value) {
       case DriverFirestoreFields.boarded:
         return AttendanceStatus.boarded;
+      case DriverFirestoreFields.alighted:
       case DriverFirestoreFields.absent:
         return AttendanceStatus.absent;
       default:
@@ -175,9 +211,9 @@ class FirestoreDriverRepository implements DriverRepository {
       case AttendanceStatus.boarded:
         return DriverFirestoreFields.boarded;
       case AttendanceStatus.absent:
-        return DriverFirestoreFields.absent;
+        return DriverFirestoreFields.alighted;
       case AttendanceStatus.notBoarded:
-        return DriverFirestoreFields.dropped; // map notBoarded->dropped as default write value
+        return DriverFirestoreFields.alighted;
     }
   }
 }
