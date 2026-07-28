@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:safe_ride_app/features/driver/data/datasources/attendance_cache_service.dart';
 import 'package:safe_ride_app/features/driver/data/models/cached_attendance_record.dart';
 
@@ -21,4 +22,7 @@ class FakeAttendanceCacheService implements AttendanceCacheService {
 
   @override
   Future<void> clearAll() async => _store.clear();
+
+  @override
+  Future<void> syncOfflineData([FirebaseFirestore? firestore]) async {}
 }
