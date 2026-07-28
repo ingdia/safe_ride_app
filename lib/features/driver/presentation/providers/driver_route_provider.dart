@@ -7,6 +7,7 @@ import '../../../../shared/providers/connectivity_provider.dart';
 import '../../data/datasources/attendance_cache_service.dart';
 import '../../data/datasources/driver_stream_service.dart';
 import '../../data/models/cached_attendance_record.dart';
+import '../../data/models/driver_alert.dart';
 import '../../data/models/route_data.dart';
 import '../../data/repositories/firestore_driver_repository.dart';
 import '../../data/repositories/mock_driver_repository.dart';
@@ -30,6 +31,14 @@ final driverStreamServiceProvider = Provider<DriverStreamService>(
 final routeDataStreamProvider =
     StreamProvider.family<RouteData?, String>((ref, routeId) {
   return ref.watch(driverStreamServiceProvider).routeDataStream(routeId);
+});
+
+/// Exposes a live [Stream] of Admin-sent [DriverAlert]s for the given [routeId].
+///
+/// Ordered by `timestamp` descending. Emits an empty list when no alerts exist.
+final driverAlertsStreamProvider =
+    StreamProvider.family<List<DriverAlert>, String>((ref, routeId) {
+  return ref.watch(driverStreamServiceProvider).alertsStream(routeId);
 });
 final driverRouteProvider = AsyncNotifierProvider<DriverRouteNotifier, DriverRouteState>(
   DriverRouteNotifier.new,

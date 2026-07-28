@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../models/driver_alert.dart';
 import '../models/route_data.dart';
+import 'driver_firestore_fields.dart';
 import 'driver_firestore_paths.dart';
 
 /// Typed snapshot of a `routes/{routeId}` document.
@@ -93,5 +95,29 @@ class DriverStreamService {
         .snapshots()
         .map((snapshot) =>
             snapshot.exists ? RouteDocument.fromSnapshot(snapshot) : null);
+  }
+
+  /// Returns a stream of Admin-sent alerts for [routeId], ordered by
+  /// `timestamp` descending (newest first).
+  ///
+  /// Listens to `routes/{routeId}/alerts`, re-emitting the full list on every
+  /// Firestore change. Emits an empty list when no alerts exist.
+  ///
+  /// Any [FirebaseException] is caught and re-thrown with the original stack
+  /// trace so Riverpod's [StreamProvider] surfaces it as [AsyncError].
+  Stream<List<DriverAlert>> alertsStream(String routeId) {
+    return _firestore
+        .collection(DriverFirestorePaths.driverAlertsCollection(routeId))
+        .orderBy(DriverFirestoreFields.timestamp, descending: true)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => DriverAlert.fromFirestore(doc))
+            .toList())
+        .handleError(
+          (Object error, StackTrace stack) {
+            Error.throwWithStackTrace(error, stack);
+          },
+          test: (error) => error is FirebaseException,
+        );
   }
 }
