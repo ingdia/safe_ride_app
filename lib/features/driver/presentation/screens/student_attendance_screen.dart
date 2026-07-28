@@ -21,14 +21,36 @@ class StudentAttendanceScreen extends ConsumerWidget {
   int _countFor(List<Student> students, AttendanceStatus status) =>
       students.where((s) => s.status == status).length;
 
+  /// Merges a live Firestore roster with the notifier's local attendance state.
+  ///
+  /// For each student in [liveRoster]:
+  /// - If the notifier already holds an attendance mark for that student,
+  ///   the local mark wins (driver taps are not overwritten by Firestore).
+  /// - Students present in [liveRoster] but absent from [localStudents] are
+  ///   appended as-is (Admin added them mid-trip).
+  /// - Students in [localStudents] but absent from [liveRoster] are dropped
+  ///   (Admin removed them mid-trip).
+  List<Student> _mergeRoster(
+    List<Student> liveRoster,
+    List<Student> localStudents,
+  ) {
+    final localById = {for (final s in localStudents) s.id: s};
+    return liveRoster.map((live) {
+      final local = localById[live.id];
+      if (local == null) return live;
+      // Keep local attendance mark; refresh name/stop/grade from Firestore.
+      return live.copyWith(status: local.status);
+    }).toList();
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(driverRouteProvider);
+    final routeAsync = ref.watch(driverRouteProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
-        child: state.when(
+        child: routeAsync.when(
           data: (routeState) {
             if (routeState is DriverRouteLoading || routeState is DriverRouteInitial) {
               return const Center(child: CircularProgressIndicator());
@@ -38,51 +60,12 @@ class StudentAttendanceScreen extends ConsumerWidget {
               return Center(child: Text('Unable to load attendance: ${routeState.message}'));
             }
 
-            final students = (routeState as DriverRouteLoaded).students;
-            final stopOrder = <String>[];
-            final byStop = <String, List<Student>>{};
-            for (final student in students) {
-              if (!byStop.containsKey(student.stopName)) {
-                stopOrder.add(student.stopName);
-                byStop[student.stopName] = [];
-              }
-              byStop[student.stopName]!.add(student);
-            }
-
-            return ListView(
-              padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.md, AppSpacing.md, AppSpacing.xxl),
-              children: [
-                _buildHeader(),
-                const SizedBox(height: AppSpacing.md),
-                Container(
-                  padding: const EdgeInsets.all(AppSpacing.md),
-                  decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(child: _SummaryPill(label: 'Waiting', count: _countFor(students, AttendanceStatus.notBoarded), color: AppColors.warning)),
-                      const SizedBox(width: AppSpacing.sm),
-                      Expanded(child: _SummaryPill(label: 'Boarded', count: _countFor(students, AttendanceStatus.boarded), color: AppColors.success)),
-                      const SizedBox(width: AppSpacing.sm),
-                      Expanded(child: _SummaryPill(label: 'Dropped Off', count: _countFor(students, AttendanceStatus.absent), color: AppColors.textSecondary)),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                ...stopOrder.expand((stopName) => [
-                      _buildStopHeader(stopName),
-                      ...byStop[stopName]!.map((student) => Padding(
-                            padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                            child: _StudentListItem(
-                              student: student,
-                              onSetStatus: (status) => _updateStatus(ref, student, status),
-                            ),
-                          )),
-                    ]),
-              ],
+            final loaded = routeState as DriverRouteLoaded;
+            return _LiveRosterBody(
+              loaded: loaded,
+              onSetStatus: (student, status) => _updateStatus(ref, student, status),
+              countFor: _countFor,
+              mergeRoster: _mergeRoster,
             );
           },
           loading: () => const Center(child: CircularProgressIndicator()),
@@ -92,6 +75,25 @@ class StudentAttendanceScreen extends ConsumerWidget {
     );
   }
 
+}
+
+/// Inner widget that watches [studentRosterStreamProvider] when a [routeId] is
+/// available, merging the live Firestore roster with the notifier's local
+/// attendance state before rendering.
+class _LiveRosterBody extends ConsumerWidget {
+  const _LiveRosterBody({
+    required this.loaded,
+    required this.onSetStatus,
+    required this.countFor,
+    required this.mergeRoster,
+  });
+
+  final DriverRouteLoaded loaded;
+  final void Function(Student, AttendanceStatus) onSetStatus;
+  final int Function(List<Student>, AttendanceStatus) countFor;
+  final List<Student> Function(List<Student>, List<Student>) mergeRoster;
+
+  // Expose the same header/stop-header builders via the parent's static helpers.
   Widget _buildHeader() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -113,6 +115,83 @@ class StudentAttendanceScreen extends ConsumerWidget {
           Expanded(child: Text(stopName, style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w700))),
         ],
       ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Derive routeId from the notifier's resolved metadata (non-empty only
+    // when FirestoreDriverRepository successfully fetched route metadata).
+    final routeDataAsync = ref.watch(routeDataStreamProvider(loaded.routeId ?? ''));
+    final rosterAsync = ref.watch(studentRosterStreamProvider(loaded.routeId ?? ''));
+
+    // Resolve the student list: live Firestore roster merged with local marks,
+    // or fall back to the notifier's list when the stream hasn't emitted yet.
+    final students = rosterAsync.maybeWhen(
+      data: (liveRoster) => liveRoster.isEmpty
+          ? loaded.students
+          : mergeRoster(liveRoster, loaded.students),
+      orElse: () => loaded.students,
+    );
+
+    // Show a subtle live-indicator badge when the stream is active.
+    final isLive = routeDataAsync.hasValue && (loaded.routeId ?? '').isNotEmpty;
+
+    final stopOrder = <String>[];
+    final byStop = <String, List<Student>>{};
+    for (final student in students) {
+      if (!byStop.containsKey(student.stopName)) {
+        stopOrder.add(student.stopName);
+        byStop[student.stopName] = [];
+      }
+      byStop[student.stopName]!.add(student);
+    }
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.md, AppSpacing.md, AppSpacing.xxl),
+      children: [
+        _buildHeader(),
+        if (isLive) ...
+          [
+            const SizedBox(height: AppSpacing.xs),
+            Row(
+              children: [
+                const Icon(Icons.circle, size: 8, color: AppColors.success),
+                const SizedBox(width: AppSpacing.xs),
+                Text('Live roster', style: AppTextStyles.bodySmall.copyWith(color: AppColors.success)),
+              ],
+            ),
+          ],
+        const SizedBox(height: AppSpacing.md),
+        Container(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Row(
+            children: [
+              Expanded(child: _SummaryPill(label: 'Waiting', count: countFor(students, AttendanceStatus.notBoarded), color: AppColors.warning)),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(child: _SummaryPill(label: 'Boarded', count: countFor(students, AttendanceStatus.boarded), color: AppColors.success)),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(child: _SummaryPill(label: 'Dropped Off', count: countFor(students, AttendanceStatus.absent), color: AppColors.textSecondary)),
+            ],
+          ),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        ...stopOrder.expand((stopName) => [
+              _buildStopHeader(stopName),
+              ...byStop[stopName]!.map((student) => Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                    child: _StudentListItem(
+                      student: student,
+                      onSetStatus: (status) => onSetStatus(student, status),
+                    ),
+                  )),
+            ]),
+      ],
     );
   }
 }

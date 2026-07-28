@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../domain/models/student.dart';
 import '../models/driver_alert.dart';
 import '../models/route_data.dart';
 import 'driver_firestore_fields.dart';
@@ -119,5 +120,57 @@ class DriverStreamService {
           },
           test: (error) => error is FirebaseException,
         );
+  }
+
+  /// Returns a live stream of [Student]s assigned to [routeId], ordered by
+  /// `stopName` then `name`.
+  ///
+  /// Listens to the top-level `students` collection filtered by
+  /// `routeId == routeId`. Re-emits the full list on every Firestore change,
+  /// allowing the UI to reflect Admin roster edits (add / remove student)
+  /// mid-trip without a manual refresh.
+  ///
+  /// Emits an empty list when no students match. Any [FirebaseException] is
+  /// caught and re-thrown so Riverpod surfaces it as [AsyncError].
+  Stream<List<Student>> studentsStream(String routeId) {
+    return _firestore
+        .collection('students')
+        .where(DriverFirestoreFields.routeId, isEqualTo: routeId)
+        .orderBy('stopName')
+        .orderBy('name')
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => _studentFromDoc(doc))
+            .toList())
+        .handleError(
+          (Object error, StackTrace stack) {
+            Error.throwWithStackTrace(error, stack);
+          },
+          test: (error) => error is FirebaseException,
+        );
+  }
+
+  Student _studentFromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
+    final data = doc.data() ?? {};
+    final statusStr = (data['status'] as String?) ?? 'notBoarded';
+    return Student(
+      id: doc.id,
+      name: (data['name'] as String?) ?? '',
+      stopName: (data['stopName'] as String?) ?? (data['routeStop'] as String?) ?? '',
+      grade: (data['grade'] as String?) ?? '',
+      status: _statusFromString(statusStr),
+    );
+  }
+
+  AttendanceStatus _statusFromString(String value) {
+    switch (value) {
+      case 'boarded':
+        return AttendanceStatus.boarded;
+      case 'alighted':
+      case 'absent':
+        return AttendanceStatus.absent;
+      default:
+        return AttendanceStatus.notBoarded;
+    }
   }
 }

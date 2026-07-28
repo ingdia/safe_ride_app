@@ -40,6 +40,17 @@ final driverAlertsStreamProvider =
     StreamProvider.family<List<DriverAlert>, String>((ref, routeId) {
   return ref.watch(driverStreamServiceProvider).alertsStream(routeId);
 });
+
+/// Exposes a live [Stream] of [Student]s assigned to [routeId].
+///
+/// Re-emits on every Admin roster change (add / remove student) so
+/// [StudentAttendanceScreen] reflects mid-trip edits without a manual refresh.
+/// Emits an empty list when [routeId] is empty or no students match.
+final studentRosterStreamProvider =
+    StreamProvider.family<List<Student>, String>((ref, routeId) {
+  if (routeId.isEmpty) return const Stream.empty();
+  return ref.watch(driverStreamServiceProvider).studentsStream(routeId);
+});
 final driverRouteProvider = AsyncNotifierProvider<DriverRouteNotifier, DriverRouteState>(
   DriverRouteNotifier.new,
 );
@@ -133,6 +144,7 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
       DriverRouteLoaded(
         stops: currentState.stops,
         students: syncedStudents,
+        routeId: _routeId,
         routeProgress: progress,
         gpsStatus: _gpsStatusFor(
           progress: progress,
@@ -201,6 +213,7 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
     return DriverRouteLoaded(
       stops: stops,
       students: syncedStudents,
+      routeId: _routeId,
       routeProgress: progress,
       gpsStatus: _gpsStatusFor(progress: progress),
     );
@@ -294,6 +307,7 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
       DriverRouteLoaded(
         stops: currentState.stops,
         students: updatedStudents,
+        routeId: _routeId,
         routeProgress: progress,
         gpsStatus: _gpsStatusFor(
           progress: progress,
@@ -324,6 +338,7 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
         DriverRouteLoaded(
           stops: currentState.stops,
           students: currentState.students,
+          routeId: _routeId,
           routeProgress: currentState.routeProgress,
           gpsStatus: _gpsStatusFor(
             progress: currentState.routeProgress,
