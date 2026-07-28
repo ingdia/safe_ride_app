@@ -85,7 +85,7 @@ void main() {
       final loaded = await container.read(driverRouteProvider.future) as DriverRouteLoaded;
       print('loaded statuses: ${loaded.students.map((s) => '${s.id}:${s.status}').join(', ')}');
       expect(loaded.students.firstWhere((s) => s.id == 's2').status, AttendanceStatus.absent);
-      expect(cache.loadAll().isEmpty, isTrue);
+      expect((await cache.loadAll()).isEmpty, isTrue);
     });
 
     test('offline notBoarded clears stale cached attendance record', () async {
@@ -99,7 +99,7 @@ void main() {
             status: AttendanceStatus.notBoarded,
           );
 
-      expect(cache.loadAll().containsKey('s1'), isFalse);
+      expect((await cache.loadAll()).containsKey('s1'), isFalse);
     });
 
     test('reconnect syncs cached attendance when connectivity returns online', () async {
@@ -126,7 +126,7 @@ void main() {
             studentId: 's1',
             status: AttendanceStatus.boarded,
           );
-      expect(cache.loadAll().containsKey('s1'), isTrue);
+      expect((await cache.loadAll()).containsKey('s1'), isTrue);
 
       final onlineCompleter = Completer<void>();
       container.listen<AsyncValue<bool>>(connectivityProvider, (prev, next) {
@@ -141,7 +141,7 @@ void main() {
       await onlineCompleter.future;
       await Future<void>.delayed(const Duration(milliseconds: 200));
 
-      expect(cache.loadAll().containsKey('s1'), isFalse);
+      expect((await cache.loadAll()).containsKey('s1'), isFalse);
       final loaded = container.read(driverRouteProvider).value as DriverRouteLoaded;
       expect(loaded.students.firstWhere((s) => s.id == 's1').status, AttendanceStatus.boarded);
     });

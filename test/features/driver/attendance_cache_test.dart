@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:safe_ride_app/features/driver/data/models/cached_attendance_record.dart';
+import 'package:safe_ride_app/features/driver/data/repositories/mock_driver_repository.dart';
 import 'package:safe_ride_app/features/driver/domain/models/student.dart';
 import 'package:safe_ride_app/features/driver/presentation/providers/driver_route_provider.dart';
 import 'package:safe_ride_app/features/driver/presentation/providers/driver_route_state.dart';
@@ -64,7 +65,8 @@ void main() {
     ProviderContainer makeContainer({required bool isOnline}) => ProviderContainer(
           overrides: [
             attendanceCacheProvider.overrideWithValue(cache),
-            connectivityProvider.overrideWith((ref) => Stream.value(isOnline)),
+            connectivityProvider.overrideWithValue(AsyncData(isOnline)),
+            driverRepositoryProvider.overrideWithValue(MockDriverRepository()),
           ],
         );
 

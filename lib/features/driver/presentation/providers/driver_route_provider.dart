@@ -83,6 +83,7 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
   late DriverRepository _repository;
   String? _routeId;
   String? _busId;
+  bool _online = true;
 
   @override
   FutureOr<DriverRouteState> build() async {
@@ -93,21 +94,15 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
       }
     });
 
-    final isOnline = ref.watch(connectivityProvider).when(
-          data: (value) => value,
+    _online = ref.watch(connectivityProvider).when(
+          data: (v) => v,
           loading: () => true,
           error: (_, __) => false,
         );
-    return _loadRoute(isOnline: isOnline);
+    return _loadRoute(isOnline: _online);
   }
 
-  bool _isOnline() {
-    return ref.read(connectivityProvider).when(
-          data: (value) => value,
-          loading: () => true,
-          error: (_, __) => false,
-        );
-  }
+  bool _isOnline() => _online;
 
   DriverRepository _repositoryForConnectivity(bool isOnline) {
     if (!isOnline) {
@@ -188,7 +183,7 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
       _busId = metadata['busId'];
     }
 
-    final cached = cacheService.loadAll();
+    final cached = await cacheService.loadAll();
     final merged = students.map((student) {
       final record = cached[student.id];
       if (record == null) return student;
@@ -236,14 +231,7 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
       orElse: () => Student(id: studentId, name: '', stopName: '', grade: ''),
     );
     final cacheService = ref.read(attendanceCacheProvider);
-    final isOnline = ref.read(connectivityProvider).maybeWhen(
-          data: (value) => value,
-          orElse: () => false,
-        );
-
-    if (isOnline) {
-      _repository = _repositoryForConnectivity(isOnline);
-    }
+    final isOnline = _online;
 
     state = const AsyncLoading<DriverRouteState>();
 
@@ -362,7 +350,7 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
     final isOnline = _isOnline();
     if (!isOnline) return students;
 
-    final cached = cacheService.loadAll();
+    final cached = await cacheService.loadAll();
     if (cached.isEmpty) return students;
 
     final syncedStudents = List<Student>.from(students);
