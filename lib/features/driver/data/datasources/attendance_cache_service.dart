@@ -95,20 +95,10 @@ class AttendanceCacheService {
 
     await batch.commit();
 
-    // Mark every synced record in the box.
+    // Delete only the records that were part of this batch. Any new offline
+    // entries written to the box during the commit are left untouched.
     for (final record in unsynced) {
-      await box.put(
-        record.studentId,
-        CachedAttendanceRecord(
-          studentId: record.studentId,
-          studentName: record.studentName,
-          stopName: record.stopName,
-          statusIndex: record.statusIndex,
-          recordedAt: record.recordedAt,
-          synced: true,
-          routeId: record.routeId,
-        ),
-      );
+      await box.delete(record.studentId);
     }
   }
 }

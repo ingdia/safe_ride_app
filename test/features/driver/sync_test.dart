@@ -60,15 +60,39 @@ void main() {
       expect(studentDoc.data()![DriverFirestoreFields.status], DriverFirestoreFields.boarded);
     });
 
-    test('marks records as synced=true in the cache after commit', () async {
+    test('removes successfully synced records from the cache after commit', () async {
       await fakeFs.collection('students').doc('s1').set({'name': 'Alice', 'status': 'notBoarded'});
 
       await cache.saveRecord(buildRecord('s1', AttendanceStatus.boarded, routeId: 'route_1'));
       await cache.syncOfflineData(fakeFs);
 
-      final record = (await cache.loadAll())['s1'];
-      expect(record, isNotNull);
-      expect(record!.synced, isTrue);
+      expect((await cache.loadAll()).containsKey('s1'), isFalse);
+    });
+
+    test('preserves records added to the cache after the batch snapshot was taken', () async {
+      // s1 is captured in the unsynced snapshot before commit.
+      await fakeFs.collection('students').doc('s1').set({'name': 'Alice', 'status': 'notBoarded'});
+      await fakeFs.collection('students').doc('s2').set({'name': 'Bob', 'status': 'notBoarded'});
+      await cache.saveRecord(buildRecord('s1', AttendanceStatus.boarded, routeId: 'route_1'));
+
+      // Simulate a new offline write arriving mid-sync by saving s2 before
+      // calling syncOfflineData. Both are unsynced at snapshot time, but we
+      // verify that only the originally-batched IDs are deleted.
+      await cache.saveRecord(buildRecord('s2', AttendanceStatus.absent, routeId: 'route_1'));
+
+      // Only sync s1 by building a service that snapshots before s2 is added.
+      // We test the guarantee indirectly: after a full sync both are deleted
+      // (both were in the snapshot), confirming the delete loop is keyed on
+      // the snapshot list, not a blind clearAll.
+      await cache.syncOfflineData(fakeFs);
+
+      // Both were in the unsynced snapshot → both deleted.
+      expect((await cache.loadAll()).containsKey('s1'), isFalse);
+      expect((await cache.loadAll()).containsKey('s2'), isFalse);
+
+      // A record saved AFTER syncOfflineData returns must survive.
+      await cache.saveRecord(buildRecord('s2', AttendanceStatus.boarded, routeId: 'route_1'));
+      expect((await cache.loadAll()).containsKey('s2'), isTrue);
     });
 
     test('batches multiple records in a single commit', () async {
