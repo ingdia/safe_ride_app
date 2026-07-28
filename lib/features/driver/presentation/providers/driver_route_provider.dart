@@ -5,7 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../shared/providers/attendance_cache_provider.dart';
 import '../../../../shared/providers/connectivity_provider.dart';
 import '../../data/datasources/attendance_cache_service.dart';
+import '../../data/datasources/driver_stream_service.dart';
 import '../../data/models/cached_attendance_record.dart';
+import '../../data/models/route_data.dart';
 import '../../data/repositories/firestore_driver_repository.dart';
 import '../../data/repositories/mock_driver_repository.dart';
 import '../../domain/models/route_stop.dart';
@@ -17,6 +19,18 @@ final driverRepositoryProvider = Provider<DriverRepository>(
   (ref) => FirestoreDriverRepository(),
 );
 
+/// Provides the [DriverStreamService] instance used for live Firestore streams.
+final driverStreamServiceProvider = Provider<DriverStreamService>(
+  (ref) => DriverStreamService(),
+);
+
+/// Exposes a live [Stream] of [RouteData] for the given [routeId].
+///
+/// Emits `null` when the route document does not exist in Firestore.
+final routeDataStreamProvider =
+    StreamProvider.family<RouteData?, String>((ref, routeId) {
+  return ref.watch(driverStreamServiceProvider).routeDataStream(routeId);
+});
 final driverRouteProvider = AsyncNotifierProvider<DriverRouteNotifier, DriverRouteState>(
   DriverRouteNotifier.new,
 );

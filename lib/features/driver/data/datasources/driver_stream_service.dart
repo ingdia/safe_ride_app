@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../models/route_data.dart';
 import 'driver_firestore_paths.dart';
 
 /// Typed snapshot of a `routes/{routeId}` document.
@@ -49,6 +50,19 @@ class DriverStreamService {
       : _firestore = firestore ?? FirebaseFirestore.instance;
 
   final FirebaseFirestore _firestore;
+
+  /// Returns a stream that emits a typed [RouteData] whenever the
+  /// `routes/{routeId}` document changes in Firestore.
+  ///
+  /// Emits `null` when the document does not exist.
+  Stream<RouteData?> routeDataStream(String routeId) {
+    return _firestore
+        .collection(DriverFirestorePaths.routes)
+        .doc(routeId)
+        .snapshots()
+        .map((snapshot) =>
+            snapshot.exists ? RouteData.fromFirestore(snapshot) : null);
+  }
 
   /// Returns a stream that emits a [RouteDocument] whenever the
   /// `routes/{routeId}` document changes in Firestore.
