@@ -262,6 +262,7 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
           statusIndex: updatedStudent.status.index,
           recordedAt: DateTime.now(),
           synced: false,
+          routeId: _routeId ?? '',
         ),
       );
     } else {
