@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../data/models/driver_alert.dart';
 import '../../domain/models/route_stop.dart';
 import '../../domain/models/student.dart';
 import '../providers/driver_navigation_provider.dart';
@@ -11,13 +12,72 @@ import '../providers/driver_profile_provider.dart';
 import '../providers/driver_route_provider.dart';
 import '../providers/driver_route_state.dart';
 
-class DriverDashboardScreen extends ConsumerWidget {
+/// Tracks the set of alert IDs already shown to the driver this session.
+///
+/// Persisted only in memory — resets on app restart, which is intentional:
+/// alerts shown in a previous session should not re-fire.
+class _SeenAlertsNotifier extends Notifier<Set<String>> {
+  @override
+  Set<String> build() => const <String>{};
+
+  void markSeen(Iterable<String> ids) {
+    state = <String>{...state, ...ids};
+  }
+}
+
+final _seenAlertIdsProvider =
+    NotifierProvider<_SeenAlertsNotifier, Set<String>>(
+  _SeenAlertsNotifier.new,
+);
+
+class DriverDashboardScreen extends ConsumerStatefulWidget {
   const DriverDashboardScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DriverDashboardScreen> createState() =>
+      _DriverDashboardScreenState();
+}
+
+class _DriverDashboardScreenState
+    extends ConsumerState<DriverDashboardScreen> {
+  @override
+  Widget build(BuildContext context) {
     final routeState = ref.watch(driverRouteProvider);
     final profile = ref.watch(driverProfileProvider);
+
+    // Resolve routeId from loaded state — empty string when on mock data.
+    final routeId = routeState.maybeWhen(
+      data: (s) => s is DriverRouteLoaded ? (s.routeId ?? '') : '',
+      orElse: () => '',
+    );
+
+    // Listen to the alerts stream and show a banner for each new alert.
+    // ref.listen in build is the idiomatic Riverpod pattern for side-effects.
+    if (routeId.isNotEmpty) {
+      ref.listen<AsyncValue<List<DriverAlert>>>(
+        driverAlertsStreamProvider(routeId),
+        (_, next) {
+          final alerts = next.whenOrNull(data: (v) => v);
+          if (alerts == null || alerts.isEmpty) return;
+
+          final seen = ref.read(_seenAlertIdsProvider);
+          final newAlerts =
+              alerts.where((a) => !seen.contains(a.alertId)).toList();
+          if (newAlerts.isEmpty) return;
+
+          // Mark all as seen before showing so rapid rebuilds don't re-fire.
+          ref
+              .read(_seenAlertIdsProvider.notifier)
+              .markSeen(newAlerts.map((a) => a.alertId));
+
+          // Show the most recent alert; dismiss any previous banner first.
+          final alert = newAlerts.first;
+          ScaffoldMessenger.of(context)
+            ..hideCurrentSnackBar()
+            ..showSnackBar(_alertSnackBar(context, alert));
+        },
+      );
+    }
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -129,7 +189,7 @@ class DriverDashboardScreen extends ConsumerWidget {
                       onTap: () => ref.read(driverNavigationProvider.notifier).selectTab(2),
                     ),
                     _ActionChip(
-                      label: 'Today’s route',
+                      label: 'Today\'s route',
                       icon: Icons.route_outlined,
                       onTap: () => ref.read(driverNavigationProvider.notifier).selectTab(1),
                     ),
@@ -151,6 +211,68 @@ class DriverDashboardScreen extends ConsumerWidget {
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (error, stack) => Center(child: Text('Unable to load route: $error')),
         ),
+      ),
+    );
+  }
+
+  SnackBar _alertSnackBar(BuildContext context, DriverAlert alert) {
+    final isUrgent = alert.type == 'sos';
+    return SnackBar(
+      duration: Duration(seconds: isUrgent ? 10 : 6),
+      backgroundColor:
+          isUrgent ? AppColors.error : AppColors.surface,
+      behavior: SnackBarBehavior.floating,
+      margin: const EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        0,
+        AppSpacing.md,
+        AppSpacing.md,
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+        side: BorderSide(
+          color: isUrgent
+              ? AppColors.error
+              : AppColors.border,
+        ),
+      ),
+      content: Row(
+        children: [
+          Icon(
+            isUrgent
+                ? Icons.warning_amber_rounded
+                : Icons.notifications_outlined,
+            color: isUrgent ? Colors.white : AppColors.primary,
+            size: 20,
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (alert.title.isNotEmpty)
+                  Text(
+                    alert.title,
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: isUrgent ? Colors.white : AppColors.textPrimary,
+                    ),
+                  ),
+                Text(
+                  alert.message,
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: isUrgent
+                        ? Colors.white.withValues(alpha: 0.9)
+                        : AppColors.textSecondary,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
