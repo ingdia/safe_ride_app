@@ -106,4 +106,16 @@ class MockDriverRepository implements DriverRepository {
     _students[index] = updatedStudent;
     return updatedStudent;
   }
+
+  @override
+  Future<void> updateBusLocation(
+    double latitude,
+    double longitude, {
+    String? routeId,
+    String? busId,
+  }) async {
+    // Mock repository does not persist GPS updates, but the interface is
+    // supported for testing and provider flow.
+    return;
+  }
 }

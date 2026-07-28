@@ -16,4 +16,12 @@ abstract class DriverRepository {
     String? routeId,
     String? busId,
   });
+
+  /// Updates the driver's bus location coordinates.
+  Future<void> updateBusLocation(
+    double latitude,
+    double longitude, {
+    String? routeId,
+    String? busId,
+  });
 }

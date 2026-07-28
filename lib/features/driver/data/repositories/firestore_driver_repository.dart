@@ -148,6 +148,34 @@ class FirestoreDriverRepository implements DriverRepository {
     }
   }
 
+  @override
+  Future<void> updateBusLocation(
+    double latitude,
+    double longitude, {
+    String? routeId,
+    String? busId,
+  }) async {
+    final metadata = (routeId != null && routeId.isNotEmpty)
+        ? {'routeId': routeId, 'busId': busId}
+        : await fetchRouteMetadata();
+    final resolvedBusId = metadata['busId'] ?? '';
+
+    if (resolvedBusId.isEmpty) {
+      return;
+    }
+
+    final busDoc = _firestore.collection(DriverFirestorePaths.buses).doc(resolvedBusId);
+    final data = <String, dynamic>{
+      DriverFirestoreFields.busLocation: {
+        DriverFirestoreFields.latitude: latitude,
+        DriverFirestoreFields.longitude: longitude,
+      },
+      DriverFirestoreFields.lastUpdatedAt: FieldValue.serverTimestamp(),
+    };
+
+    await busDoc.set(data, SetOptions(merge: true));
+  }
+
   RouteStop _mapRouteStopFromMap(Map<String, dynamic> data) {
     final order = (data['order'] is num) ? (data['order'] as num).toInt() : 0;
     final name = (data['name'] as String?) ?? '';

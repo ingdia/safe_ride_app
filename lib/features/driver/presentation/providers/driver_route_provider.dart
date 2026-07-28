@@ -186,7 +186,37 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
       ),
     );
   }
+  Future<void> updateBusLocation({
+    required double latitude,
+    required double longitude,
+  }) async {
+    final currentState = state.value;
+    if (currentState is! DriverRouteLoaded) return;
 
+    state = const AsyncLoading<DriverRouteState>();
+
+    try {
+      await _repository.updateBusLocation(
+        latitude,
+        longitude,
+        routeId: _routeId,
+        busId: _busId,
+      );
+      state = AsyncData(
+        DriverRouteLoaded(
+          stops: currentState.stops,
+          students: currentState.students,
+          routeProgress: currentState.routeProgress,
+          gpsStatus: 'Bus location updated',
+        ),
+      );
+    } catch (_) {
+      state = AsyncError(
+        DriverRouteError(message: 'Unable to update bus location.'),
+        StackTrace.current,
+      );
+    }
+  }
   Future<List<Student>> _syncPendingCachedAttendance({
     required DriverRepository repository,
     required List<Student> students,
