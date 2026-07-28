@@ -1,10 +1,10 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
-import '../../data/models/route_data.dart';
 import '../../domain/models/route_stop.dart';
 import '../providers/driver_route_provider.dart';
 import '../providers/driver_route_state.dart';
@@ -23,7 +23,7 @@ class TodaysRouteScreen extends ConsumerWidget {
   const TodaysRouteScreen({super.key});
 
   int _totalStudents(List<RouteStop> stops) =>
-      stops.fold(0, (sum, stop) => sum + stop.studentCount);
+      stops.fold(0, (acc, stop) => acc + stop.studentCount);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -454,12 +454,16 @@ class TodaysRouteScreen extends ConsumerWidget {
   }
 }
 
-/// Wraps [_buildSummaryCard] in a [StreamBuilder] that listens to
-/// [routeDataStreamProvider] for the given [routeId].
+/// Wraps the summary card in a Riverpod [AsyncValue] consumer that handles
+/// all stream states explicitly:
 ///
-/// While the stream is loading it shows the card with the stops-derived
-/// defaults. When a [RouteData] arrives, the card header updates to show
-/// the live route name, bus ID, scheduled time, and ETA from Firestore.
+/// - **loading** — renders the card skeleton with placeholder text so the
+///   layout never jumps when the first snapshot arrives.
+/// - **error** — catches [FirebaseException] (permission-denied, unavailable,
+///   etc.) and any other error, showing a friendly inline banner inside the
+///   card instead of letting the exception bubble up as a broken screen.
+/// - **data / null** — renders the live card; a `null` snapshot (document
+///   does not exist) falls back to the notifier stops and default labels.
 class _LiveSummaryCard extends ConsumerWidget {
   const _LiveSummaryCard({
     required this.routeId,
@@ -474,38 +478,113 @@ class _LiveSummaryCard extends ConsumerWidget {
   final String gpsStatus;
 
   int _totalStudents(List<RouteStop> s) =>
-      s.fold(0, (sum, stop) => sum + stop.studentCount);
+      s.fold(0, (acc, stop) => acc + stop.studentCount);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final streamValue = ref.watch(routeDataStreamProvider(routeId));
 
-    final routeData = streamValue.whenOrNull(data: (d) => d);
+    return streamValue.when(
+      // ── Loading ────────────────────────────────────────────────────────
+      loading: () => _buildCard(
+        context,
+        stops: stops,
+        progress: progress,
+        gpsStatus: gpsStatus,
+        routeName: '…',
+        busLabel: '…',
+        scheduledTime: '',
+        etaMinutes: null,
+        trailing: const SizedBox(
+          width: 14,
+          height: 14,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: Colors.white,
+          ),
+        ),
+      ),
+      // ── Error ──────────────────────────────────────────────────────────
+      error: (error, _) {
+        final message = _friendlyError(error);
+        return _buildCard(
+          context,
+          stops: stops,
+          progress: progress,
+          gpsStatus: gpsStatus,
+          routeName: 'Route unavailable',
+          busLabel: '—',
+          scheduledTime: '',
+          etaMinutes: null,
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.warning_amber_rounded,
+                  color: Colors.white, size: 14),
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text(
+                  message,
+                  style: AppTextStyles.bodySmall
+                      .copyWith(color: Colors.white),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+      // ── Data (including null = document not found) ─────────────────────
+      data: (routeData) {
+        if (routeData == null) {
+          // Document does not exist — fall back to notifier data silently.
+          return _buildCard(
+            context,
+            stops: stops,
+            progress: progress,
+            gpsStatus: gpsStatus,
+            routeName: 'Route A',
+            busLabel: 'Bus #12',
+            scheduledTime: '',
+            etaMinutes: null,
+          );
+        }
 
-    final routeName = routeData?.name.isNotEmpty == true
-        ? routeData!.name
-        : 'Route A';
-    final busLabel = routeData?.busId.isNotEmpty == true
-        ? 'Bus ${routeData!.busId}'
-        : 'Bus #12';
-    final scheduledTime = routeData?.scheduledTime ?? '';
-    final etaMinutes = routeData?.etaMinutes;
-
-    // Use live stops from Firestore when available, otherwise keep the
-    // notifier stops so the list never goes blank during a stream reconnect.
-    final liveStops =
-        (routeData != null && routeData.stops.isNotEmpty) ? routeData.stops : stops;
-
-    return _buildCard(
-      context,
-      stops: liveStops,
-      progress: progress,
-      gpsStatus: gpsStatus,
-      routeName: routeName,
-      busLabel: busLabel,
-      scheduledTime: scheduledTime,
-      etaMinutes: etaMinutes,
+        final liveStops = routeData.stops.isNotEmpty ? routeData.stops : stops;
+        return _buildCard(
+          context,
+          stops: liveStops,
+          progress: progress,
+          gpsStatus: gpsStatus,
+          routeName: routeData.name.isNotEmpty ? routeData.name : 'Route A',
+          busLabel:
+              routeData.busId.isNotEmpty ? 'Bus ${routeData.busId}' : 'Bus #12',
+          scheduledTime: routeData.scheduledTime,
+          etaMinutes: routeData.etaMinutes,
+        );
+      },
     );
+  }
+
+  /// Converts any error to a short, user-friendly string.
+  ///
+  /// [FirebaseException] codes are mapped to plain English; all other errors
+  /// fall back to a generic message so raw exception text never reaches the UI.
+  String _friendlyError(Object error) {
+    if (error is FirebaseException) {
+      switch (error.code) {
+        case 'permission-denied':
+          return 'No permission to read route';
+        case 'unavailable':
+        case 'network-request-failed':
+          return 'No connection — retrying';
+        case 'not-found':
+          return 'Route not found';
+        default:
+          return 'Route sync error (${error.code})';
+      }
+    }
+    return 'Could not load route';
   }
 
   Widget _buildCard(
@@ -517,6 +596,7 @@ class _LiveSummaryCard extends ConsumerWidget {
     required String busLabel,
     required String scheduledTime,
     required int? etaMinutes,
+    Widget? trailing,
   }) {
     final firstStopTime = stops.isNotEmpty ? stops.first.time : scheduledTime;
     final etaLabel = etaMinutes != null ? '$etaMinutes min' : firstStopTime;
@@ -545,22 +625,25 @@ class _LiveSummaryCard extends ConsumerWidget {
                   size: 28,
                 ),
                 const SizedBox(width: AppSpacing.sm),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      busLabel,
-                      style: AppTextStyles.headingSmall
-                          .copyWith(color: Colors.white),
-                    ),
-                    Text(
-                      routeName,
-                      style: AppTextStyles.bodySmall.copyWith(
-                        color: Colors.white.withValues(alpha: 0.9),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        busLabel,
+                        style: AppTextStyles.headingSmall
+                            .copyWith(color: Colors.white),
                       ),
-                    ),
-                  ],
+                      Text(
+                        routeName,
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: Colors.white.withValues(alpha: 0.9),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
+                ?trailing,
               ],
             ),
             const SizedBox(height: AppSpacing.md),

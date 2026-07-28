@@ -55,13 +55,25 @@ class DriverStreamService {
   /// `routes/{routeId}` document changes in Firestore.
   ///
   /// Emits `null` when the document does not exist.
+  ///
+  /// Any [FirebaseException] (e.g. permission-denied, unavailable) is caught
+  /// and re-emitted as a stream error so callers receive a typed error event
+  /// instead of an unhandled exception crashing the widget tree.
   Stream<RouteData?> routeDataStream(String routeId) {
     return _firestore
         .collection(DriverFirestorePaths.routes)
         .doc(routeId)
         .snapshots()
         .map((snapshot) =>
-            snapshot.exists ? RouteData.fromFirestore(snapshot) : null);
+            snapshot.exists ? RouteData.fromFirestore(snapshot) : null)
+        .handleError(
+          (Object error, StackTrace stack) {
+            // Re-throw so Riverpod's StreamProvider surfaces it as
+            // AsyncError, which _LiveSummaryCard handles explicitly.
+            Error.throwWithStackTrace(error, stack);
+          },
+          test: (error) => error is FirebaseException,
+        );
   }
 
   /// Returns a stream that emits a [RouteDocument] whenever the
