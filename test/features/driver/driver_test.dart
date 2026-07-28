@@ -55,6 +55,24 @@ void main() {
       final student = loaded.students.firstWhere((item) => item.id == 's1');
       expect(student.status, AttendanceStatus.boarded);
     });
+
+    test('bus location updates update gps status', () async {
+      final container = makeContainer(isOnline: true);
+      addTearDown(container.dispose);
+
+      await container.read(driverRouteProvider.future);
+      await container.read(driverRouteProvider.notifier).updateBusLocation(
+            latitude: -1.9445,
+            longitude: 30.0612,
+          );
+
+      final state = container.read(driverRouteProvider);
+      expect(state.value, isA<DriverRouteLoaded>());
+
+      final loaded = state.value as DriverRouteLoaded;
+      expect(loaded.gpsStatus, contains('GPS live'));
+      expect(loaded.lastGpsUpdateAt, isNotNull);
+    });
   });
 
   group('MockDriverRepository', () {

@@ -84,9 +84,7 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
       stops: stops,
       students: syncedStudents,
       routeProgress: progress,
-      gpsStatus: progress >= 1.0
-          ? 'All students marked'
-          : 'Route progress ${(progress * 100).round()}%',
+      gpsStatus: _gpsStatusFor(progress: progress),
     );
   }
 
@@ -180,9 +178,11 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
         stops: currentState.stops,
         students: updatedStudents,
         routeProgress: progress,
-        gpsStatus: progress >= 1.0
-            ? 'All students marked'
-            : 'Route progress ${(progress * 100).round()}%',
+        gpsStatus: _gpsStatusFor(
+          progress: progress,
+          lastGpsUpdateAt: currentState.lastGpsUpdateAt,
+        ),
+        lastGpsUpdateAt: currentState.lastGpsUpdateAt,
       ),
     );
   }
@@ -202,12 +202,17 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
         routeId: _routeId,
         busId: _busId,
       );
+      final now = DateTime.now();
       state = AsyncData(
         DriverRouteLoaded(
           stops: currentState.stops,
           students: currentState.students,
           routeProgress: currentState.routeProgress,
-          gpsStatus: 'Bus location updated',
+          gpsStatus: _gpsStatusFor(
+            progress: currentState.routeProgress,
+            lastGpsUpdateAt: now,
+          ),
+          lastGpsUpdateAt: now,
         ),
       );
     } catch (_) {
@@ -252,5 +257,22 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
     }
 
     return syncedStudents;
+  }
+
+  String _gpsStatusFor({
+    required double progress,
+    DateTime? lastGpsUpdateAt,
+  }) {
+    if (lastGpsUpdateAt != null) {
+      final elapsed = DateTime.now().difference(lastGpsUpdateAt);
+      if (elapsed.inMinutes < 1) {
+        return 'GPS live • updated just now';
+      }
+      return 'GPS live • updated ${elapsed.inMinutes} min ago';
+    }
+
+    return progress >= 1.0
+        ? 'All students marked'
+        : 'Route progress ${(progress * 100).round()}%';
   }
 }
