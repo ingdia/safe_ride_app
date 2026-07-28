@@ -79,4 +79,21 @@ class DriverFirestoreFields {
 
   /// Firestore server timestamp updated on every GPS write.
   static const String lastUpdatedAt = 'lastUpdatedAt';
+
+  // ── Driver alert fields ───────────────────────────────────────────────────
+
+  /// Auto-generated document ID stored inside the alert document.
+  static const String alertId = 'alertId';
+
+  /// Short title of the alert (e.g. `"Road closure on Route A"`).
+  static const String alertTitle = 'title';
+
+  /// Full alert message body.
+  static const String alertMessage = 'message';
+
+  /// Alert type string — e.g. `"general"`, `"sos"`, `"arrival"`.
+  static const String alertType = 'type';
+
+  /// Whether the driver has read/acknowledged this alert.
+  static const String alertIsRead = 'isRead';
 }
