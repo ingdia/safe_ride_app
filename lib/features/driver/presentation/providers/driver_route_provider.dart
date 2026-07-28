@@ -21,6 +21,30 @@ final driverRouteProvider = AsyncNotifierProvider<DriverRouteNotifier, DriverRou
   DriverRouteNotifier.new,
 );
 
+/// Riverpod [AsyncNotifier] that owns the driver's active-route state.
+///
+/// ## Attendance update flow
+///
+/// [updateStudentAttendanceStatus] decides the write strategy based on
+/// connectivity:
+///
+/// - **Online:** calls [DriverRepository.updateStudentAttendanceStatus] with
+///   the resolved [_routeId] / [_busId], then removes any stale cache entry.
+/// - **Offline:** delegates to [MockDriverRepository] for an optimistic local
+///   update and persists a [CachedAttendanceRecord] (synced = false) via
+///   [AttendanceCacheService].
+/// - **notBoarded:** resets the student locally and deletes any cached record
+///   without touching Firestore.
+///
+/// When connectivity is restored, [_syncCachedAttendanceIfOnline] replays
+/// every pending cache record against Firestore and clears the cache.
+///
+/// ## GPS update flow
+///
+/// [updateBusLocation] forwards coordinates to
+/// [DriverRepository.updateBusLocation] and, on success, stamps
+/// [DriverRouteLoaded.lastGpsUpdateAt] so the UI can display a live
+/// "updated just now" indicator.
 class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
   late DriverRepository _repository;
   String? _routeId;

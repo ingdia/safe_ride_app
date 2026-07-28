@@ -7,12 +7,46 @@ import '../datasources/driver_firestore_paths.dart';
 import '../datasources/driver_firestore_fields.dart';
 
 /// Firestore-backed implementation of [DriverRepository].
+///
+/// ## Attendance flow
+///
+/// When the driver marks a student the following writes happen atomically in
+/// sequence:
+///
+/// 1. A new document is created in
+///    `routes/{routeId}/attendance/{auto-id}` (or the top-level `attendance`
+///    collection when [routeId] is unavailable). The document contains all
+///    fields defined in [DriverFirestoreFields] so the ERD structure is
+///    preserved.
+/// 2. The canonical `students/{studentId}` document has its `status` field
+///    updated so that Admin and Parent Firestore listeners reflect the change
+///    in real time without querying the subcollection.
+///
+/// [AttendanceStatus.notBoarded] is treated as a client-side reset and
+/// produces **no** Firestore write.
+///
+/// ## GPS flow
+///
+/// [updateBusLocation] merges `{ busLocation: { latitude, longitude },
+/// lastUpdatedAt: serverTimestamp }` into `buses/{busId}` using
+/// [SetOptions.merge], so existing bus metadata is never overwritten.
+/// The write is skipped when [busId] cannot be resolved from route metadata.
+///
+/// ## Route-metadata resolution
+///
+/// Both write methods accept optional [routeId] and [busId] parameters. When
+/// they are omitted or empty, [fetchRouteMetadata] queries the first document
+/// in the `routes` collection to resolve them. Callers that already hold the
+/// IDs (e.g. [DriverRouteNotifier]) should pass them directly to avoid the
+/// extra round-trip.
 class FirestoreDriverRepository implements DriverRepository {
   FirestoreDriverRepository({FirebaseFirestore? firestore})
       : _firestore = firestore ?? FirebaseFirestore.instance;
 
   final FirebaseFirestore _firestore;
 
+  /// Fetches the first route document and returns its ID and associated
+  /// [busId]. Returns an empty map when no routes exist or on error.
   Future<Map<String, String?>> fetchRouteMetadata() async {
     try {
       final query = await _firestore
@@ -40,9 +74,9 @@ class FirestoreDriverRepository implements DriverRepository {
       final stops = query.docs.map((doc) {
         final data = doc.data();
 
-        // Support two shapes:
-        // 1) Each document represents a stop with top-level fields.
-        // 2) A route document contains a list field (e.g. `stops` or `routeStops`).
+        // Support two document shapes:
+        // 1) Each document IS a stop (top-level fields).
+        // 2) A route document contains a `stops` list field.
 
         if (data.containsKey('stops') && data['stops'] is List) {
           final rawStops = data['stops'] as List;
@@ -76,6 +110,19 @@ class FirestoreDriverRepository implements DriverRepository {
     }
   }
 
+  /// Records an attendance event for [studentId] in Firestore.
+  ///
+  /// **Write 1 — attendance subcollection:**
+  /// Creates a document at `routes/{routeId}/attendance/{auto-id}` containing
+  /// all ERD fields ([DriverFirestoreFields]). Falls back to the top-level
+  /// `attendance` collection when [routeId] is empty.
+  ///
+  /// **Write 2 — canonical student document:**
+  /// Updates `students/{studentId}.status` so Admin and Parent listeners
+  /// receive the change via their existing Firestore snapshots.
+  ///
+  /// [AttendanceStatus.notBoarded] skips both writes and returns a stub
+  /// [Student] immediately.
   @override
   Future<Student> updateStudentAttendanceStatus(
     String studentId,
@@ -148,6 +195,14 @@ class FirestoreDriverRepository implements DriverRepository {
     }
   }
 
+  /// Merges the bus's current GPS coordinates into `buses/{busId}`.
+  ///
+  /// Uses [SetOptions.merge] so only [DriverFirestoreFields.busLocation] and
+  /// [DriverFirestoreFields.lastUpdatedAt] are touched; all other fields on
+  /// the bus document are preserved.
+  ///
+  /// The write is skipped silently when [busId] cannot be resolved from
+  /// [routeId] or [fetchRouteMetadata].
   @override
   Future<void> updateBusLocation(
     double latitude,
