@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "860734666404",
+    "project_id": "safe-ride-app-5733f",
+    "storage_bucket": "safe-ride-app-5733f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:860734666404:android:936a268bd90b7b51639831",
+        "android_client_info": {
+          "package_name": "com.example.safe_ride_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDnp3j72ieq9aWEZCqj3KOONX9whWBKODI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
