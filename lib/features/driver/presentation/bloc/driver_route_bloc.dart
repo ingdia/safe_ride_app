@@ -30,7 +30,7 @@ class DriverRouteBloc extends Bloc<DriverRouteEvent, DriverRouteState> {
       final stops = await _repository.fetchRouteStops();
       final students = await _repository.fetchRouteStudents();
 
-      final cached = _cacheService.loadAll();
+      final cached = await _cacheService.loadAll();
       final merged = students.map((s) {
         final record = cached[s.id];
         if (record == null) return s;

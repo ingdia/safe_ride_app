@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:safe_ride_app/features/driver/data/models/cached_attendance_record.dart';
@@ -12,6 +13,17 @@ import 'package:safe_ride_app/shared/providers/connectivity_provider.dart';
 
 import '../../helpers/fake_attendance_cache_service.dart';
 
+/// Spy that records how many times [syncOfflineData] was called.
+class _SpyCacheService extends FakeAttendanceCacheService {
+  int syncCallCount = 0;
+
+  @override
+  Future<void> syncOfflineData([FirebaseFirestore? firestore]) async {
+    syncCallCount++;
+    await super.syncOfflineData(firestore);
+  }
+}
+
 void main() {
   group('DriverRouteProvider', () {
     late FakeAttendanceCacheService cache;
@@ -21,7 +33,7 @@ void main() {
     ProviderContainer makeContainer({required bool isOnline}) => ProviderContainer(
           overrides: [
             attendanceCacheProvider.overrideWithValue(cache),
-            connectivityProvider.overrideWith((ref) => Stream.value(isOnline)),
+            connectivityProvider.overrideWithValue(AsyncData(isOnline)),
             driverRepositoryProvider.overrideWithValue(MockDriverRepository()),
           ],
         );
@@ -85,7 +97,7 @@ void main() {
       final loaded = await container.read(driverRouteProvider.future) as DriverRouteLoaded;
       print('loaded statuses: ${loaded.students.map((s) => '${s.id}:${s.status}').join(', ')}');
       expect(loaded.students.firstWhere((s) => s.id == 's2').status, AttendanceStatus.absent);
-      expect(cache.loadAll().isEmpty, isTrue);
+      expect((await cache.loadAll()).isEmpty, isTrue);
     });
 
     test('offline notBoarded clears stale cached attendance record', () async {
@@ -99,56 +111,73 @@ void main() {
             status: AttendanceStatus.notBoarded,
           );
 
-      expect(cache.loadAll().containsKey('s1'), isFalse);
+      expect((await cache.loadAll()).containsKey('s1'), isFalse);
     });
 
     test('reconnect syncs cached attendance when connectivity returns online', () async {
-      final connectivityStream = StreamController<bool>();
+      final connectivityController = StreamController<bool>.broadcast();
+      bool currentOnline = false;
       final container = ProviderContainer(
         overrides: [
           attendanceCacheProvider.overrideWithValue(cache),
-          connectivityProvider.overrideWith((ref) async* {
-            yield false;
-            yield* connectivityStream.stream;
-          }),
+          connectivityProvider.overrideWithValue(AsyncData(currentOnline)),
           driverRepositoryProvider.overrideWithValue(MockDriverRepository()),
         ],
       );
       addTearDown(() {
-        connectivityStream.close();
+        connectivityController.close();
         container.dispose();
       });
 
-      final loadFuture = container.read(driverRouteProvider.future);
-      await loadFuture;
+      await container.read(driverRouteProvider.future);
 
       await container.read(driverRouteProvider.notifier).updateStudentAttendanceStatus(
             studentId: 's1',
             status: AttendanceStatus.boarded,
           );
-      expect(cache.loadAll().containsKey('s1'), isTrue);
+      expect((await cache.loadAll()).containsKey('s1'), isTrue);
 
-      final onlineCompleter = Completer<void>();
-      container.listen<AsyncValue<bool>>(connectivityProvider, (prev, next) {
-        if (next.when(data: (value) => value == true, loading: () => false, error: (_, __) => false)) {
-          if (!onlineCompleter.isCompleted) {
-            onlineCompleter.complete();
-          }
-        }
-      });
-
-      connectivityStream.add(true);
-      await onlineCompleter.future;
+      // Simulate coming back online by updating the override.
+      container.updateOverrides([
+        attendanceCacheProvider.overrideWithValue(cache),
+        connectivityProvider.overrideWithValue(const AsyncData(true)),
+        driverRepositoryProvider.overrideWithValue(MockDriverRepository()),
+      ]);
       await Future<void>.delayed(const Duration(milliseconds: 200));
 
-      expect(cache.loadAll().containsKey('s1'), isFalse);
+      expect((await cache.loadAll()).containsKey('s1'), isFalse);
       final loaded = container.read(driverRouteProvider).value as DriverRouteLoaded;
       expect(loaded.students.firstWhere((s) => s.id == 's1').status, AttendanceStatus.boarded);
     });
+    test('reconnect calls syncOfflineData exactly once', () async {
+      final spy = _SpyCacheService();
+      await spy.saveRecord(_makeRecord('s1', AttendanceStatus.boarded));
+
+      final container = ProviderContainer(
+        overrides: [
+          attendanceCacheProvider.overrideWithValue(spy),
+          connectivityProvider.overrideWithValue(const AsyncData(false)),
+          driverRepositoryProvider.overrideWithValue(MockDriverRepository()),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container.read(driverRouteProvider.future);
+      final syncCountAfterLoad = spy.syncCallCount;
+
+      container.updateOverrides([
+        attendanceCacheProvider.overrideWithValue(spy),
+        connectivityProvider.overrideWithValue(const AsyncData(true)),
+        driverRepositoryProvider.overrideWithValue(MockDriverRepository()),
+      ]);
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+
+      expect(spy.syncCallCount, syncCountAfterLoad + 1);
+    });
+
   });
 
-  group('MockDriverRepository', () {
-    test('returns expected sample data', () async {
+  group('MockDriverRepository', () {    test('returns expected sample data', () async {
       final repository = MockDriverRepository();
 
       final stops = await repository.fetchRouteStops();

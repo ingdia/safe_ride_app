@@ -43,57 +43,62 @@ class _OfflineAttendanceScreenState extends ConsumerState<OfflineAttendanceScree
 
             final students = state.students;
             final online = connectivity.maybeWhen(data: (value) => value, orElse: () => true);
-            final cachedRecords = cacheService.loadAll();
-            final cachedCount = cachedRecords.length;
 
-            return ListView(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              children: [
-                Container(
+            return FutureBuilder<int>(
+              future: cacheService.loadAll().then((m) => m.length),
+              initialData: 0,
+              builder: (context, snapshot) {
+                final cachedCount = snapshot.data ?? 0;
+                return ListView(
                   padding: const EdgeInsets.all(AppSpacing.md),
-                  decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-                    border: Border.all(color: AppColors.border),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.03),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(online ? Icons.wifi_rounded : Icons.wifi_off_rounded, color: online ? AppColors.success : AppColors.warning),
-                          const SizedBox(width: AppSpacing.sm),
-                          Text(online ? 'Online • sync ready' : 'Offline — save locally', style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w700)),
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                        border: Border.all(color: AppColors.border),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.03),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
                         ],
                       ),
-                      const SizedBox(height: AppSpacing.sm),
-                      Text(online ? 'Attendance updates will sync immediately.' : 'Attendance marks are saved locally and will sync when connectivity returns.', style: AppTextStyles.bodySmall),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                Text('Pending local saves', style: AppTextStyles.headingSmall),
-                const SizedBox(height: AppSpacing.sm),
-                Text('$cachedCount local record${cachedCount == 1 ? '' : 's'} waiting to sync', style: AppTextStyles.bodySmall),
-                const SizedBox(height: AppSpacing.md),
-                ...students.map((student) => _OfflineStudentTile(student: student, online: online, cacheService: cacheService)),
-                const SizedBox(height: AppSpacing.md),
-                SizedBox(
-                  width: double.infinity,
-                  height: AppSpacing.tapTargetMin + 8,
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('Return to driver route'),
-                  ),
-                ),
-              ],
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(online ? Icons.wifi_rounded : Icons.wifi_off_rounded, color: online ? AppColors.success : AppColors.warning),
+                              const SizedBox(width: AppSpacing.sm),
+                              Text(online ? 'Online • sync ready' : 'Offline — save locally', style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w700)),
+                            ],
+                          ),
+                          const SizedBox(height: AppSpacing.sm),
+                          Text(online ? 'Attendance updates will sync immediately.' : 'Attendance marks are saved locally and will sync when connectivity returns.', style: AppTextStyles.bodySmall),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    Text('Pending local saves', style: AppTextStyles.headingSmall),
+                    const SizedBox(height: AppSpacing.sm),
+                    Text('$cachedCount local record${cachedCount == 1 ? '' : 's'} waiting to sync', style: AppTextStyles.bodySmall),
+                    const SizedBox(height: AppSpacing.md),
+                    ...students.map((student) => _OfflineStudentTile(student: student, online: online, cacheService: cacheService)),
+                    const SizedBox(height: AppSpacing.md),
+                    SizedBox(
+                      width: double.infinity,
+                      height: AppSpacing.tapTargetMin + 8,
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const Text('Return to driver route'),
+                      ),
+                    ),
+                  ],
+                );
+              },
             );
           },
           loading: () => const Center(child: CircularProgressIndicator()),

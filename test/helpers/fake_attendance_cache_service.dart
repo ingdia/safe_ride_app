@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:safe_ride_app/features/driver/data/datasources/attendance_cache_service.dart';
 import 'package:safe_ride_app/features/driver/data/models/cached_attendance_record.dart';
 
@@ -11,7 +12,7 @@ class FakeAttendanceCacheService implements AttendanceCacheService {
   }
 
   @override
-  Map<String, CachedAttendanceRecord> loadAll() =>
+  Future<Map<String, CachedAttendanceRecord>> loadAll() async =>
       Map.unmodifiable(_store);
 
   @override
@@ -21,4 +22,9 @@ class FakeAttendanceCacheService implements AttendanceCacheService {
 
   @override
   Future<void> clearAll() async => _store.clear();
+
+  @override
+  Future<void> syncOfflineData([FirebaseFirestore? firestore]) async {
+    _store.removeWhere((_, r) => !r.synced);
+  }
 }
