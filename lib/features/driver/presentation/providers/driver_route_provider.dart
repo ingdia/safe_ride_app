@@ -17,6 +17,40 @@ final driverRepositoryProvider = Provider<DriverRepository>(
   (ref) => FirestoreDriverRepository(),
 );
 
+<<<<<<< HEAD
+/// Provides the [DriverStreamService] instance used for live Firestore streams.
+final driverStreamServiceProvider = Provider<DriverStreamService>(
+  (ref) => DriverStreamService(),
+);
+
+/// Exposes a live [Stream] of [RouteData] for the given [routeId].
+///
+/// Emits `null` when the route document does not exist in Firestore.
+final routeDataStreamProvider =
+    StreamProvider.family<RouteData?, String>((ref, routeId) {
+  return ref.watch(driverStreamServiceProvider).routeDataStream(routeId);
+});
+
+/// Exposes a live [Stream] of Admin-sent [DriverAlert]s for the given [routeId].
+///
+/// Ordered by `timestamp` descending. Emits an empty list when no alerts exist.
+final driverAlertsStreamProvider =
+    StreamProvider.family<List<DriverAlert>, String>((ref, routeId) {
+  return ref.watch(driverStreamServiceProvider).alertsStream(routeId);
+});
+
+/// Exposes a live [Stream] of [Student]s assigned to [routeId].
+///
+/// Re-emits on every Admin roster change (add / remove student) so
+/// [StudentAttendanceScreen] reflects mid-trip edits without a manual refresh.
+/// Emits an empty list when [routeId] is empty or no students match.
+final studentRosterStreamProvider =
+    StreamProvider.family<List<Student>, String>((ref, routeId) {
+  if (routeId.isEmpty) return const Stream.empty();
+  return ref.watch(driverStreamServiceProvider).studentsStream(routeId);
+});
+=======
+>>>>>>> origin/main
 final driverRouteProvider = AsyncNotifierProvider<DriverRouteNotifier, DriverRouteState>(
   DriverRouteNotifier.new,
 );
@@ -110,6 +144,7 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
       DriverRouteLoaded(
         stops: currentState.stops,
         students: syncedStudents,
+        routeId: _routeId,
         routeProgress: progress,
         gpsStatus: _gpsStatusFor(
           progress: progress,
@@ -178,6 +213,7 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
     return DriverRouteLoaded(
       stops: stops,
       students: syncedStudents,
+      routeId: _routeId,
       routeProgress: progress,
       gpsStatus: _gpsStatusFor(progress: progress),
     );
@@ -271,6 +307,7 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
       DriverRouteLoaded(
         stops: currentState.stops,
         students: updatedStudents,
+        routeId: _routeId,
         routeProgress: progress,
         gpsStatus: _gpsStatusFor(
           progress: progress,
@@ -301,6 +338,7 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
         DriverRouteLoaded(
           stops: currentState.stops,
           students: currentState.students,
+          routeId: _routeId,
           routeProgress: currentState.routeProgress,
           gpsStatus: _gpsStatusFor(
             progress: currentState.routeProgress,
