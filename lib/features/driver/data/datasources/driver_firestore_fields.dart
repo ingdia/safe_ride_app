@@ -50,7 +50,11 @@ class DriverFirestoreFields {
 
   /// Firestore server timestamp written via [FieldValue.serverTimestamp].
   static const String timestamp = 'timestamp';
-
+  /// Alert-specific fields for the driver route alerts collection.
+  static const String alertTitle = 'title';
+  static const String alertMessage = 'message';
+  static const String alertType = 'type';
+  static const String alertIsRead = 'isRead';
   /// Identifies the source of the write; always `"driver_app"` for records
   /// created by this repository.
   static const String recordedBy = 'recordedBy';
