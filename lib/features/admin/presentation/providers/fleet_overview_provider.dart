@@ -1,12 +1,15 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../data/models/bus_model.dart';
 import '../../data/models/route_model.dart';
+import '../../data/models/student_model.dart';
 import '../../data/models/user_model.dart';
 import 'buses_provider.dart';
-import 'users_provider.dart';
 import 'routes_provider.dart';
+import 'students_provider.dart';
+import 'users_provider.dart';
 
-enum FleetBusStatus { onTime, delayed }
+enum FleetBusStatus { onTime, delayed, sos }
 
 class FleetBusSummary {
   final String busId;
@@ -30,22 +33,6 @@ class FleetBusSummary {
   });
 }
 
-final Map<String, int> _mockStudentCounts = {
-  'bus-12': 18,
-  'bus-07': 22,
-  'bus-15': 20,
-  'bus-03': 16,
-};
-
-final Map<String, FleetBusStatus> _mockStatuses = {
-  'bus-12': FleetBusStatus.onTime,
-  'bus-07': FleetBusStatus.delayed,
-  'bus-15': FleetBusStatus.onTime,
-  'bus-03': FleetBusStatus.onTime,
-};
-
-final Map<String, String> _mockStatusNotes = {'bus-07': 'Delayed by 8 minutes'};
-
 BusModel? _findBus(List<BusModel> buses, String busId) {
   for (final bus in buses) {
     if (bus.busId == busId) return bus;
@@ -60,10 +47,27 @@ UserModel? _findDriver(List<UserModel> users, String driverId) {
   return null;
 }
 
+FleetBusStatus _statusFromBus(BusModel bus) {
+  switch (bus.status) {
+    case BusStatus.sos:
+      return FleetBusStatus.sos;
+    case BusStatus.active:
+      return FleetBusStatus.onTime;
+    case BusStatus.idle:
+      return FleetBusStatus.onTime;
+  }
+}
+
 final fleetSummaryProvider = Provider<List<FleetBusSummary>>((ref) {
-  final buses = ref.watch(busesProvider);
-  final users = ref.watch(usersProvider);
-  final routes = ref.watch(routesProvider);
+  final buses = ref.watch(busesListProvider);
+  final users = ref.watch(usersListProvider);
+  final routes = ref.watch(routesListProvider);
+  final students = ref.watch(studentsListProvider);
+
+  final studentsByRoute = <String, int>{};
+  for (final StudentModel s in students) {
+    studentsByRoute[s.routeId] = (studentsByRoute[s.routeId] ?? 0) + 1;
+  }
 
   final summaries = <FleetBusSummary>[];
   final assignedBusIds = <String>{};
@@ -74,38 +78,31 @@ final fleetSummaryProvider = Provider<List<FleetBusSummary>>((ref) {
     final driver = _findDriver(users, bus.driverId);
     assignedBusIds.add(bus.busId);
 
-    summaries.add(
-      FleetBusSummary(
-        busId: bus.busId,
-        plateNumber: bus.plateNumber,
-        driverName: driver?.name ?? 'Unassigned',
-        studentCount: _mockStudentCounts[bus.busId] ?? 0,
-        capacity: bus.capacity,
-        routeName: route.name,
-        status: _mockStatuses[bus.busId] ?? FleetBusStatus.onTime,
-        statusNote: _mockStatusNotes[bus.busId],
-      ),
-    );
+    summaries.add(FleetBusSummary(
+      busId: bus.busId,
+      plateNumber: bus.plateNumber,
+      driverName: driver?.name ?? 'Unassigned',
+      studentCount: studentsByRoute[route.routeId] ?? 0,
+      capacity: bus.capacity,
+      routeName: route.name,
+      status: _statusFromBus(bus),
+      statusNote: bus.status == BusStatus.sos ? 'SOS alert active' : null,
+    ));
   }
 
-  // Buses with no route yet (e.g. just created via BusFormSheet) still show
-  // up here instead of silently disappearing from Active Fleet, since
-  // BusFormSheet doesn't currently collect a route assignment.
   for (final bus in buses) {
     if (assignedBusIds.contains(bus.busId)) continue;
     final driver = _findDriver(users, bus.driverId);
-    summaries.add(
-      FleetBusSummary(
-        busId: bus.busId,
-        plateNumber: bus.plateNumber,
-        driverName: driver?.name ?? 'Unassigned',
-        studentCount: _mockStudentCounts[bus.busId] ?? 0,
-        capacity: bus.capacity,
-        routeName: 'No route assigned',
-        status: _mockStatuses[bus.busId] ?? FleetBusStatus.onTime,
-        statusNote: _mockStatusNotes[bus.busId],
-      ),
-    );
+    summaries.add(FleetBusSummary(
+      busId: bus.busId,
+      plateNumber: bus.plateNumber,
+      driverName: driver?.name ?? 'Unassigned',
+      studentCount: 0,
+      capacity: bus.capacity,
+      routeName: 'No route assigned',
+      status: _statusFromBus(bus),
+      statusNote: bus.status == BusStatus.sos ? 'SOS alert active' : null,
+    ));
   }
 
   return summaries;
@@ -123,21 +120,14 @@ class FleetStats {
   });
 }
 
-// Previously hardcoded (22 / 465 / 94%), so the stat cards never reflected
-// real add/edit/delete activity. Now derived from fleetSummaryProvider so
-// adding or removing a bus actually moves these numbers.
 final fleetStatsProvider = Provider<FleetStats>((ref) {
   final summaries = ref.watch(fleetSummaryProvider);
 
   final activeBuses = summaries.length;
-  final totalStudents = summaries.fold<int>(
-    0,
-    (sum, s) => sum + s.studentCount,
-  );
-
-  final onTimeCount = summaries
-      .where((s) => s.status == FleetBusStatus.onTime)
-      .length;
+  final totalStudents =
+      summaries.fold<int>(0, (sum, s) => sum + s.studentCount);
+  final onTimeCount =
+      summaries.where((s) => s.status == FleetBusStatus.onTime).length;
   final onTimePercent = summaries.isEmpty
       ? 100
       : ((onTimeCount / summaries.length) * 100).round();

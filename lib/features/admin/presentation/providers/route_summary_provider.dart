@@ -1,7 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../data/models/bus_model.dart';
+import '../../data/models/student_model.dart';
 import 'buses_provider.dart';
 import 'routes_provider.dart';
+import 'students_provider.dart';
 
 class RouteSummary {
   final String routeId;
@@ -21,25 +24,6 @@ class RouteSummary {
   });
 }
 
-final Map<String, String> _backupBusIdByRouteId = {
-  'route-a': 'bus-08',
-  'route-c': 'bus-19',
-};
-
-final Map<String, int> _mockDurationMinutes = {
-  'route-a': 45,
-  'route-b': 40,
-  'route-c': 55,
-  'route-d': 35,
-};
-
-final Map<String, int> _mockRouteStudentCounts = {
-  'route-a': 38,
-  'route-b': 22,
-  'route-c': 46,
-  'route-d': 16,
-};
-
 BusModel? _findBus(List<BusModel> buses, String busId) {
   for (final bus in buses) {
     if (bus.busId == busId) return bus;
@@ -48,26 +32,24 @@ BusModel? _findBus(List<BusModel> buses, String busId) {
 }
 
 final routeSummaryProvider = Provider<List<RouteSummary>>((ref) {
-  final routes = ref.watch(routesProvider);
-  final buses = ref.watch(busesProvider);
+  final routes = ref.watch(routesListProvider);
+  final buses = ref.watch(busesListProvider);
+  final students = ref.watch(studentsListProvider);
+
+  final studentsByRoute = <String, int>{};
+  for (final StudentModel s in students) {
+    studentsByRoute[s.routeId] = (studentsByRoute[s.routeId] ?? 0) + 1;
+  }
 
   return routes.map((route) {
-    final primaryBus = _findBus(buses, route.busId);
-    final backupBusId = _backupBusIdByRouteId[route.routeId];
-
-    final plateNumbers = <String>[primaryBus?.plateNumber ?? 'Unassigned'];
-    if (backupBusId != null) {
-      final backupBus = _findBus(buses, backupBusId);
-      plateNumbers.add(backupBus?.plateNumber ?? 'Unassigned');
-    }
-
+    final bus = _findBus(buses, route.busId);
     return RouteSummary(
       routeId: route.routeId,
       name: route.name,
-      busPlateNumbers: plateNumbers,
+      busPlateNumbers: [bus?.plateNumber ?? 'Unassigned'],
       stopCount: route.stops.length,
-      durationMinutes: _mockDurationMinutes[route.routeId] ?? 0,
-      studentCount: _mockRouteStudentCounts[route.routeId] ?? 0,
+      durationMinutes: 0,
+      studentCount: studentsByRoute[route.routeId] ?? 0,
     );
   }).toList();
 });
