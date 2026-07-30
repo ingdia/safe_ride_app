@@ -71,7 +71,7 @@ class _RouteFormSheetState extends ConsumerState<RouteFormSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final buses = ref.watch(busesProvider);
+    final buses = ref.watch(busesListProvider);
     final isEditing = widget.existingRoute != null;
     final validBusId = buses.any((b) => b.busId == _selectedBusId)
         ? _selectedBusId
@@ -228,6 +228,7 @@ class _RouteFormSheetState extends ConsumerState<RouteFormSheet> {
       busId: _selectedBusId!,
       name: _nameController.text.trim(),
       stops: stops,
+      createdAt: widget.existingRoute?.createdAt ?? DateTime.now(),
     );
     Navigator.of(context).pop(route);
   }

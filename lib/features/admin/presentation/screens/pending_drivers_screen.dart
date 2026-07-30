@@ -1,6 +1,6 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../data/models/driver_model.dart';
+import '../../data/models/user_model.dart';
 import '../providers/drivers_provider.dart';
 import '../widgets/admin_ui_constants.dart';
 import '../widgets/gradient_header.dart';
@@ -11,9 +11,7 @@ class PendingDriversScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final drivers = ref.watch(driversProvider);
-    final pendingCount = drivers
-        .where((d) => d.status == DriverApprovalStatus.pending)
-        .length;
+    final pendingCount = ref.watch(pendingDriversCountProvider);
 
     return Scaffold(
       backgroundColor: AdminUiColors.scaffoldBackground,
@@ -39,11 +37,11 @@ class PendingDriversScreen extends ConsumerWidget {
                 itemBuilder: (context, index) => _DriverCard(
                   driver: drivers[index],
                   onApprove: () => ref
-                      .read(driversProvider.notifier)
-                      .approveDriver(drivers[index].driverId),
+                      .read(driversNotifierProvider.notifier)
+                      .approveDriver(drivers[index].userId),
                   onReject: () => ref
-                      .read(driversProvider.notifier)
-                      .rejectDriver(drivers[index].driverId),
+                      .read(driversNotifierProvider.notifier)
+                      .rejectDriver(drivers[index].userId),
                 ),
               ),
             ),
@@ -55,7 +53,7 @@ class PendingDriversScreen extends ConsumerWidget {
 }
 
 class _DriverCard extends StatelessWidget {
-  final DriverModel driver;
+  final UserModel driver;
   final VoidCallback onApprove;
   final VoidCallback onReject;
 
@@ -67,7 +65,9 @@ class _DriverCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isPending = driver.status == DriverApprovalStatus.pending;
+    final isPending =
+        driver.approvalStatus == DriverApprovalStatus.pending ||
+        driver.approvalStatus == null;
 
     return Container(
       padding: const EdgeInsets.all(AdminUiSpacing.md),
@@ -111,18 +111,16 @@ class _DriverCard extends StatelessWidget {
                   ],
                 ),
               ),
-              _StatusChip(status: driver.status),
+              _StatusChip(status: driver.approvalStatus),
             ],
           ),
-          const SizedBox(height: AdminUiSpacing.sm),
-          Text(
-            'License: ${driver.licenseNumber}',
-            style: const TextStyle(fontSize: 12.5),
-          ),
-          Text(
-            'Phone: ${driver.phone}',
-            style: const TextStyle(fontSize: 12.5),
-          ),
+          if (driver.phone.isNotEmpty) ...[
+            const SizedBox(height: AdminUiSpacing.sm),
+            Text(
+              'Phone: ${driver.phone}',
+              style: const TextStyle(fontSize: 12.5),
+            ),
+          ],
           if (isPending) ...[
             const SizedBox(height: AdminUiSpacing.sm),
             Row(
@@ -153,22 +151,17 @@ class _DriverCard extends StatelessWidget {
 }
 
 class _StatusChip extends StatelessWidget {
-  final DriverApprovalStatus status;
+  final DriverApprovalStatus? status;
 
   const _StatusChip({required this.status});
 
   @override
   Widget build(BuildContext context) {
-    late final Color bg;
-    late final Color fg;
-    late final String label;
+    final Color bg;
+    final Color fg;
+    final String label;
 
     switch (status) {
-      case DriverApprovalStatus.pending:
-        bg = AdminUiColors.statCardBackground;
-        fg = AdminUiColors.primaryOrange;
-        label = 'Pending';
-        break;
       case DriverApprovalStatus.approved:
         bg = AdminUiColors.onTimeBg;
         fg = AdminUiColors.onTimeFg;
@@ -179,6 +172,10 @@ class _StatusChip extends StatelessWidget {
         fg = AdminUiColors.delayedFg;
         label = 'Rejected';
         break;
+      default:
+        bg = AdminUiColors.statCardBackground;
+        fg = AdminUiColors.primaryOrange;
+        label = 'Pending';
     }
 
     return Container(

@@ -20,8 +20,14 @@ class FleetOverviewScreen extends ConsumerWidget {
   const FleetOverviewScreen({super.key});
 
   Future<void> _handleAddBus(BuildContext context, WidgetRef ref) async {
-    final school = ref.read(schoolProvider);
-    final result = await BusFormSheet.show(context, schoolId: school.schoolId);
+    final String schoolId;
+    try {
+      schoolId = (await ref.read(schoolProvider.future)).schoolId;
+    } catch (_) {
+      return;
+    }
+    if (!context.mounted) return;
+    final result = await BusFormSheet.show(context, schoolId: schoolId);
     if (result != null) {
       ref.read(busesProvider.notifier).addBus(result);
     }
@@ -32,8 +38,14 @@ class FleetOverviewScreen extends ConsumerWidget {
     WidgetRef ref,
     String busId,
   ) async {
-    final school = ref.read(schoolProvider);
-    final buses = ref.read(busesProvider);
+    final String schoolId;
+    try {
+      schoolId = (await ref.read(schoolProvider.future)).schoolId;
+    } catch (_) {
+      return;
+    }
+    if (!context.mounted) return;
+    final buses = ref.read(busesListProvider);
     BusModel? existing;
     for (final bus in buses) {
       if (bus.busId == busId) {
@@ -52,7 +64,7 @@ class FleetOverviewScreen extends ConsumerWidget {
     final result = await BusFormSheet.show(
       context,
       existingBus: existing,
-      schoolId: school.schoolId,
+      schoolId: schoolId,
     );
     if (result != null) {
       ref.read(busesProvider.notifier).updateBus(result);

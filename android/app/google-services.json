@@ -1,0 +1,46 @@
+{
+  "project_info": {
+    "project_number": "978345093220",
+    "project_id": "safe-ride-b6af5",
+    "storage_bucket": "safe-ride-b6af5.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:978345093220:android:ce1688afb5b6a8b8ca9771",
+        "android_client_info": {
+          "package_name": "com.example.safe_ride_app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "978345093220-p6d0uf0f37lnp76jo7pjhias4p76v2ir.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDxwOy5Rn9giSlw3eoT8D7J2azHMFDj6EU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "978345093220-p6d0uf0f37lnp76jo7pjhias4p76v2ir.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "978345093220-5nfsabi6mglp50rbt7oqqfgb6971q75o.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.safeRideApp"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

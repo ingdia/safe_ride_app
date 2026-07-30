@@ -1,41 +1,51 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../data/models/driver_model.dart';
-import '../../data/repositories/drivers_repository.dart';
 
-final driversRepositoryProvider = Provider((ref) => DriversRepository());
+import '../../data/models/user_model.dart';
+import '../providers/users_provider.dart';
 
-final driversProvider = NotifierProvider<DriversNotifier, List<DriverModel>>(
-  DriversNotifier.new,
-);
+// ---------------------------------------------------------------------------
+// Derived providers — no separate repository needed; drivers are users
+// ---------------------------------------------------------------------------
 
-class DriversNotifier extends Notifier<List<DriverModel>> {
-  @override
-  List<DriverModel> build() {
-    return ref.read(driversRepositoryProvider).fetchDrivers();
-  }
+final driversProvider = Provider<List<UserModel>>((ref) {
+  return ref
+      .watch(schoolUsersListProvider)
+      .where((u) => u.role == UserRole.driver)
+      .toList();
+});
 
-  void approveDriver(String driverId) {
-    ref
-        .read(driversRepositoryProvider)
-        .updateStatus(driverId, DriverApprovalStatus.approved);
-    state = ref.read(driversRepositoryProvider).fetchDrivers();
-  }
-
-  void rejectDriver(String driverId) {
-    ref
-        .read(driversRepositoryProvider)
-        .updateStatus(driverId, DriverApprovalStatus.rejected);
-    state = ref.read(driversRepositoryProvider).fetchDrivers();
-  }
-}
-
-final pendingDriversProvider = Provider<List<DriverModel>>((ref) {
+final pendingDriversProvider = Provider<List<UserModel>>((ref) {
   return ref
       .watch(driversProvider)
-      .where((d) => d.status == DriverApprovalStatus.pending)
+      .where((d) => d.approvalStatus == DriverApprovalStatus.pending)
       .toList();
 });
 
 final pendingDriversCountProvider = Provider<int>((ref) {
   return ref.watch(pendingDriversProvider).length;
 });
+
+// ---------------------------------------------------------------------------
+// Approval actions — write directly to Firestore via UsersRepository
+// ---------------------------------------------------------------------------
+
+class DriversNotifier extends Notifier<void> {
+  @override
+  void build() {}
+
+  Future<void> approveDriver(String userId) async {
+    await ref
+        .read(usersRepositoryProvider)
+        .updateApprovalStatus(userId, DriverApprovalStatus.approved);
+  }
+
+  Future<void> rejectDriver(String userId) async {
+    await ref
+        .read(usersRepositoryProvider)
+        .updateApprovalStatus(userId, DriverApprovalStatus.rejected);
+  }
+}
+
+final driversNotifierProvider = NotifierProvider<DriversNotifier, void>(
+  DriversNotifier.new,
+);

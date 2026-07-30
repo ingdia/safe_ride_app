@@ -57,7 +57,7 @@ class _BusFormSheetState extends ConsumerState<BusFormSheet> {
   @override
   Widget build(BuildContext context) {
     final drivers = ref
-        .watch(usersProvider)
+        .watch(schoolUsersListProvider)
         .where((u) => u.role == UserRole.driver)
         .toList();
     final isEditing = widget.existingBus != null;
@@ -173,6 +173,7 @@ class _BusFormSheetState extends ConsumerState<BusFormSheet> {
       capacity: int.parse(_capacityController.text.trim()),
       driverId: _selectedDriverId!,
       schoolId: widget.schoolId,
+      createdAt: widget.existingBus?.createdAt ?? DateTime.now(),
     );
     Navigator.of(context).pop(bus);
   }

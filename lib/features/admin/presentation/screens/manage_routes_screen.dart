@@ -12,10 +12,16 @@ class ManageRoutesScreen extends ConsumerWidget {
   const ManageRoutesScreen({super.key});
 
   Future<void> _handleCreate(BuildContext context, WidgetRef ref) async {
-    final school = ref.read(schoolProvider);
+    final String schoolId;
+    try {
+      schoolId = (await ref.read(schoolProvider.future)).schoolId;
+    } catch (_) {
+      return;
+    }
+    if (!context.mounted) return;
     final result = await RouteFormSheet.show(
       context,
-      schoolId: school.schoolId,
+      schoolId: schoolId,
     );
     if (result != null) {
       ref.read(routesProvider.notifier).addRoute(result);
@@ -27,14 +33,20 @@ class ManageRoutesScreen extends ConsumerWidget {
     WidgetRef ref,
     String routeId,
   ) async {
-    final school = ref.read(schoolProvider);
+    final String schoolId;
+    try {
+      schoolId = (await ref.read(schoolProvider.future)).schoolId;
+    } catch (_) {
+      return;
+    }
+    if (!context.mounted) return;
     final existing = ref
-        .read(routesProvider)
+        .read(routesListProvider)
         .firstWhere((r) => r.routeId == routeId);
     final result = await RouteFormSheet.show(
       context,
       existingRoute: existing,
-      schoolId: school.schoolId,
+      schoolId: schoolId,
     );
     if (result != null) {
       ref.read(routesProvider.notifier).updateRoute(result);
