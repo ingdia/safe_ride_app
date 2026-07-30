@@ -1,65 +1,49 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+import '../../../../core/firebase/firebase_collections.dart';
 import '../models/bus_model.dart';
 
 class BusesRepository {
-  final List<BusModel> _buses = [
-    const BusModel(
-      busId: 'bus-12',
-      plateNumber: '#12',
-      capacity: 24,
-      driverId: 'user-driver-12',
-      schoolId: 'school-1',
-    ),
-    const BusModel(
-      busId: 'bus-07',
-      plateNumber: '#07',
-      capacity: 24,
-      driverId: 'user-driver-07',
-      schoolId: 'school-1',
-    ),
-    const BusModel(
-      busId: 'bus-15',
-      plateNumber: '#15',
-      capacity: 24,
-      driverId: 'user-driver-15',
-      schoolId: 'school-1',
-    ),
-    const BusModel(
-      busId: 'bus-03',
-      plateNumber: '#03',
-      capacity: 24,
-      driverId: 'user-driver-03',
-      schoolId: 'school-1',
-    ),
-    const BusModel(
-      busId: 'bus-08',
-      plateNumber: '#08',
-      capacity: 24,
-      driverId: 'user-driver-12',
-      schoolId: 'school-1',
-    ),
-    const BusModel(
-      busId: 'bus-19',
-      plateNumber: '#19',
-      capacity: 24,
-      driverId: 'user-driver-15',
-      schoolId: 'school-1',
-    ),
-  ];
+  BusesRepository(this._firestore);
 
-  List<BusModel> getAll() => List.unmodifiable(_buses);
+  final FirebaseFirestore _firestore;
 
-  void add(BusModel bus) {
-    _buses.add(bus);
+  CollectionReference<Map<String, dynamic>> get _col =>
+      _firestore.collection(FirebaseCollections.buses);
+
+  Stream<List<BusModel>> stream(String schoolId) {
+    return _col
+        .where('school_id', isEqualTo: schoolId)
+        .orderBy('created_at', descending: false)
+        .snapshots()
+        .map((snap) => snap.docs.map(BusModel.fromFirestore).toList());
   }
 
-  void update(BusModel bus) {
-    final index = _buses.indexWhere((b) => b.busId == bus.busId);
-    if (index != -1) {
-      _buses[index] = bus;
+  Future<void> add(BusModel bus) async {
+    await _col.doc(bus.busId).set(bus.toFirestore());
+  }
+
+  Future<void> update(BusModel bus) async {
+    await _col.doc(bus.busId).update(bus.toFirestore());
+  }
+
+  Future<void> delete(String busId) async {
+    await _col.doc(busId).delete();
+  }
+
+  Future<int> deleteStale(String schoolId) async {
+    final cutoff = DateTime.now()
+        .subtract(const Duration(days: kBusStaleThresholdDays));
+    final snap = await _col
+        .where('school_id', isEqualTo: schoolId)
+        .where('driver_id', isEqualTo: '')
+        .where('created_at', isLessThan: Timestamp.fromDate(cutoff))
+        .get();
+    final batch = _firestore.batch();
+    for (final doc in snap.docs) {
+      batch.delete(doc.reference);
     }
-  }
-
-  void delete(String busId) {
-    _buses.removeWhere((b) => b.busId == busId);
+    await batch.commit();
+    return snap.docs.length;
   }
 }

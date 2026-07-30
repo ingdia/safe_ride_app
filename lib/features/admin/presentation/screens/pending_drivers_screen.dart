@@ -1,6 +1,6 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../data/models/driver_model.dart';
+import '../../data/models/user_model.dart';
 import '../providers/drivers_provider.dart';
 import '../widgets/admin_ui_constants.dart';
 import '../widgets/gradient_header.dart';
@@ -12,7 +12,7 @@ class PendingDriversScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final drivers = ref.watch(driversProvider);
     final pendingCount = drivers
-        .where((d) => d.status == DriverApprovalStatus.pending)
+        .where((d) => d.approvalStatus == DriverApprovalStatus.pending)
         .length;
 
     return Scaffold(
@@ -39,11 +39,11 @@ class PendingDriversScreen extends ConsumerWidget {
                 itemBuilder: (context, index) => _DriverCard(
                   driver: drivers[index],
                   onApprove: () => ref
-                      .read(driversProvider.notifier)
-                      .approveDriver(drivers[index].driverId),
+                      .read(driversNotifierProvider.notifier)
+                      .approveDriver(drivers[index].userId),
                   onReject: () => ref
-                      .read(driversProvider.notifier)
-                      .rejectDriver(drivers[index].driverId),
+                      .read(driversNotifierProvider.notifier)
+                      .rejectDriver(drivers[index].userId),
                 ),
               ),
             ),
@@ -55,7 +55,7 @@ class PendingDriversScreen extends ConsumerWidget {
 }
 
 class _DriverCard extends StatelessWidget {
-  final DriverModel driver;
+  final UserModel driver;
   final VoidCallback onApprove;
   final VoidCallback onReject;
 
@@ -67,7 +67,8 @@ class _DriverCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isPending = driver.status == DriverApprovalStatus.pending;
+    final isPending =
+        driver.approvalStatus == DriverApprovalStatus.pending;
 
     return Container(
       padding: const EdgeInsets.all(AdminUiSpacing.md),
@@ -111,14 +112,10 @@ class _DriverCard extends StatelessWidget {
                   ],
                 ),
               ),
-              _StatusChip(status: driver.status),
+              _StatusChip(status: driver.approvalStatus ?? DriverApprovalStatus.pending),
             ],
           ),
           const SizedBox(height: AdminUiSpacing.sm),
-          Text(
-            'License: ${driver.licenseNumber}',
-            style: const TextStyle(fontSize: 12.5),
-          ),
           Text(
             'Phone: ${driver.phone}',
             style: const TextStyle(fontSize: 12.5),

@@ -19,6 +19,7 @@ class BusFormSheet extends ConsumerStatefulWidget {
     return showModalBottomSheet<BusModel>(
       context: context,
       isScrollControlled: true,
+      useRootNavigator: true,
       backgroundColor: Colors.transparent,
       builder: (_) =>
           BusFormSheet(existingBus: existingBus, schoolId: schoolId),
@@ -58,8 +59,9 @@ class _BusFormSheetState extends ConsumerState<BusFormSheet> {
   Widget build(BuildContext context) {
     final drivers = ref
         .watch(usersProvider)
-        .where((u) => u.role == UserRole.driver)
-        .toList();
+        .value
+        ?.where((u) => u.role == UserRole.driver)
+        .toList() ?? [];
     final isEditing = widget.existingBus != null;
     final validDriverId = drivers.any((d) => d.userId == _selectedDriverId)
         ? _selectedDriverId
@@ -173,6 +175,7 @@ class _BusFormSheetState extends ConsumerState<BusFormSheet> {
       capacity: int.parse(_capacityController.text.trim()),
       driverId: _selectedDriverId!,
       schoolId: widget.schoolId,
+      createdAt: widget.existingBus?.createdAt ?? DateTime.now(),
     );
     Navigator.of(context).pop(bus);
   }
