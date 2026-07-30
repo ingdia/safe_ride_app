@@ -1,10 +1,11 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:safe_ride_app/features/driver/data/models/cached_attendance_record.dart';
-import 'package:safe_ride_app/features/driver/data/repositories/mock_driver_repository.dart';
 import 'package:safe_ride_app/features/driver/domain/models/student.dart';
-import 'package:safe_ride_app/features/driver/presentation/bloc/driver_route_bloc.dart';
-import 'package:safe_ride_app/features/driver/presentation/bloc/driver_route_event.dart';
-import 'package:safe_ride_app/features/driver/presentation/bloc/driver_route_state.dart';
+import 'package:safe_ride_app/features/driver/presentation/providers/driver_route_provider.dart';
+import 'package:safe_ride_app/features/driver/presentation/providers/driver_route_state.dart';
+import 'package:safe_ride_app/shared/providers/attendance_cache_provider.dart';
+import 'package:safe_ride_app/shared/providers/connectivity_provider.dart';
 
 import '../../helpers/fake_attendance_cache_service.dart';
 
@@ -13,87 +14,83 @@ void main() {
 
   setUp(() => cache = FakeAttendanceCacheService());
 
-  DriverRouteBloc makeBloc({required bool isOnline}) => DriverRouteBloc(
-        repository: MockDriverRepository(),
-        cacheService: cache,
-        isOnline: isOnline,
+  ProviderContainer makeContainer({required bool isOnline}) => ProviderContainer(
+        overrides: [
+          attendanceCacheProvider.overrideWithValue(cache),
+          connectivityProvider.overrideWith((ref) => Stream.value(isOnline)),
+        ],
       );
 
-  Future<void> loadAndWait(DriverRouteBloc bloc) async {
-    bloc.add(const LoadDriverRoute());
-    await Future<void>.delayed(const Duration(milliseconds: 100));
+  Future<DriverRouteState> loadAndWait(ProviderContainer container) async {
+    return await container.read(driverRouteProvider.future);
   }
 
   Future<void> updateAndWait(
-    DriverRouteBloc bloc,
+    ProviderContainer container,
     String studentId,
     AttendanceStatus status,
   ) async {
-    bloc.add(UpdateStudentAttendanceStatus(studentId: studentId, status: status));
-    await Future<void>.delayed(const Duration(milliseconds: 100));
+    await container.read(driverRouteProvider.notifier).updateStudentAttendanceStatus(
+          studentId: studentId,
+          status: status,
+        );
   }
 
   group('Offline attendance UI state', () {
-    test('emits DriverRouteLoading then DriverRouteLoaded on load', () async {
-      final bloc = makeBloc(isOnline: false);
-      addTearDown(bloc.close);
+    test('emits DriverRouteLoaded on load', () async {
+      final container = makeContainer(isOnline: false);
+      addTearDown(container.dispose);
 
-      final states = <DriverRouteState>[];
-      final sub = bloc.stream.listen(states.add);
-      await loadAndWait(bloc);
-      await sub.cancel();
-
-      expect(states[0], isA<DriverRouteLoading>());
-      expect(states[1], isA<DriverRouteLoaded>());
+      final state = await loadAndWait(container);
+      expect(state, isA<DriverRouteLoaded>());
     });
 
-    test('offline mark updates student status in emitted state', () async {
-      final bloc = makeBloc(isOnline: false);
-      addTearDown(bloc.close);
-      await loadAndWait(bloc);
-      await updateAndWait(bloc, 's1', AttendanceStatus.boarded);
+    test('offline mark updates student status in state', () async {
+      final container = makeContainer(isOnline: false);
+      addTearDown(container.dispose);
+      await loadAndWait(container);
+      await updateAndWait(container, 's1', AttendanceStatus.boarded);
 
-      final loaded = bloc.state as DriverRouteLoaded;
+      final loaded = container.read(driverRouteProvider).value as DriverRouteLoaded;
       final s1 = loaded.students.firstWhere((s) => s.id == 's1');
       expect(s1.status, AttendanceStatus.boarded);
     });
 
-    test('offline mark updates routeProgress in emitted state', () async {
-      final bloc = makeBloc(isOnline: false);
-      addTearDown(bloc.close);
-      await loadAndWait(bloc);
-      await updateAndWait(bloc, 's1', AttendanceStatus.boarded);
+    test('offline mark updates routeProgress in state', () async {
+      final container = makeContainer(isOnline: false);
+      addTearDown(container.dispose);
+      await loadAndWait(container);
+      await updateAndWait(container, 's1', AttendanceStatus.boarded);
 
-      final loaded = bloc.state as DriverRouteLoaded;
+      final loaded = container.read(driverRouteProvider).value as DriverRouteLoaded;
       expect(loaded.routeProgress, greaterThan(0.0));
     });
 
     test('gpsStatus reflects offline progress correctly', () async {
-      final bloc = makeBloc(isOnline: false);
-      addTearDown(bloc.close);
-      await loadAndWait(bloc);
-      await updateAndWait(bloc, 's1', AttendanceStatus.boarded);
+      final container = makeContainer(isOnline: false);
+      addTearDown(container.dispose);
+      await loadAndWait(container);
+      await updateAndWait(container, 's1', AttendanceStatus.boarded);
 
-      final loaded = bloc.state as DriverRouteLoaded;
+      final loaded = container.read(driverRouteProvider).value as DriverRouteLoaded;
       expect(loaded.gpsStatus, contains('Route progress'));
     });
 
     test('marking all students offline sets gpsStatus to all-marked message', () async {
-      final bloc = makeBloc(isOnline: false);
-      addTearDown(bloc.close);
-      await loadAndWait(bloc);
+      final container = makeContainer(isOnline: false);
+      addTearDown(container.dispose);
+      await loadAndWait(container);
 
       for (final id in ['s1', 's2', 's3', 's4', 's5']) {
-        await updateAndWait(bloc, id, AttendanceStatus.boarded);
+        await updateAndWait(container, id, AttendanceStatus.boarded);
       }
 
-      final loaded = bloc.state as DriverRouteLoaded;
+      final loaded = container.read(driverRouteProvider).value as DriverRouteLoaded;
       expect(loaded.routeProgress, 1.0);
       expect(loaded.gpsStatus, 'All students marked');
     });
 
-    test('cached statuses are reflected in UI state on fresh bloc load', () async {
-      // Simulate data saved during a previous offline session.
+    test('cached statuses are reflected in state on fresh load', () async {
       await cache.saveRecord(CachedAttendanceRecord(
         studentId: 's3',
         studentName: 'Aline Mukamana',
@@ -103,26 +100,27 @@ void main() {
         synced: false,
       ));
 
-      final bloc = makeBloc(isOnline: false);
-      addTearDown(bloc.close);
-      await loadAndWait(bloc);
+      final container = makeContainer(isOnline: false);
+      addTearDown(container.dispose);
+      final state = await loadAndWait(container);
 
-      final loaded = bloc.state as DriverRouteLoaded;
+      final loaded = state as DriverRouteLoaded;
       final s3 = loaded.students.firstWhere((s) => s.id == 's3');
       expect(s3.status, AttendanceStatus.absent);
     });
 
     test('multiple offline updates accumulate correctly in cache', () async {
-      final bloc = makeBloc(isOnline: false);
-      addTearDown(bloc.close);
-      await loadAndWait(bloc);
+      final container = makeContainer(isOnline: false);
+      addTearDown(container.dispose);
+      await loadAndWait(container);
 
-      await updateAndWait(bloc, 's1', AttendanceStatus.boarded);
-      await updateAndWait(bloc, 's2', AttendanceStatus.absent);
+      await updateAndWait(container, 's1', AttendanceStatus.boarded);
+      await updateAndWait(container, 's2', AttendanceStatus.absent);
 
-      expect(cache.loadAll().length, 2);
-      expect(cache.loadAll()['s1']!.statusIndex, AttendanceStatus.boarded.index);
-      expect(cache.loadAll()['s2']!.statusIndex, AttendanceStatus.absent.index);
+      final loadedCache = await cache.loadAll();
+      expect(loadedCache.length, 2);
+      expect(loadedCache['s1']!.statusIndex, AttendanceStatus.boarded.index);
+      expect(loadedCache['s2']!.statusIndex, AttendanceStatus.absent.index);
     });
   });
 }
