@@ -7,6 +7,8 @@ import '../../../../shared/providers/connectivity_provider.dart';
 import '../../data/datasources/driver_stream_service.dart';
 import '../../data/datasources/attendance_cache_service.dart';
 import '../../data/models/cached_attendance_record.dart';
+import '../../data/models/driver_alert.dart';
+import '../../data/models/route_data.dart';
 import '../../data/repositories/firestore_driver_repository.dart';
 import '../../data/repositories/mock_driver_repository.dart';
 import '../../domain/models/route_stop.dart';
@@ -95,7 +97,7 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
 
     _online = ref.read(connectivityProvider).when(
       data: (v) => v,
-      loading: () => true,
+      loading: () => false,
       error: (_, __) => false,
     );
 

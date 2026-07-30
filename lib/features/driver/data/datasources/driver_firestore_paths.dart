@@ -59,4 +59,7 @@ class DriverFirestorePaths {
 
   /// Path to the bus document used for GPS updates: `buses/{busId}`.
   static String busLocationField(String busId) => '$buses/$busId';
+
+  /// Path to the alerts subcollection keyed by route: `routes/{routeId}/alerts`.
+  static String driverAlertsCollection(String routeId) => '$routes/$routeId/alerts';
 }
