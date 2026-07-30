@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../data/models/user_model.dart';
 import '../providers/users_provider.dart';
 import '../widgets/admin_ui_constants.dart';
 import '../widgets/gradient_header.dart';
@@ -18,8 +19,17 @@ class ProfileScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final admin = ref.watch(currentAdminProvider);
+    final adminAsync = ref.watch(currentAdminProvider);
 
+    return adminAsync.when(
+      loading: () =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
+      error: (e, _) => Scaffold(body: Center(child: Text(e.toString()))),
+      data: (admin) => _buildScaffold(context, ref, admin),
+    );
+  }
+
+  Widget _buildScaffold(BuildContext context, WidgetRef ref, UserModel admin) {
     return Scaffold(
       backgroundColor: AdminUiColors.scaffoldBackground,
       body: SafeArea(

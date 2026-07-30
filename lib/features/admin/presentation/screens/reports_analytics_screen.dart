@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/attendance_provider.dart';
+import '../providers/fleet_overview_provider.dart';
+import '../providers/on_time_performance_provider.dart';
 import '../widgets/admin_ui_constants.dart';
 import '../widgets/gradient_header.dart';
 import 'transport_analytics_screen.dart';
@@ -79,7 +83,7 @@ class ReportsAnalyticsScreen extends StatelessWidget {
               padding: const EdgeInsets.symmetric(
                 horizontal: AdminUiSpacing.md,
               ),
-              sliver: SliverToBoxAdapter(child: _PerformanceGrid()),
+              sliver: const SliverToBoxAdapter(child: _PerformanceGrid()),
             ),
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(
@@ -192,11 +196,30 @@ class _SectionLabel extends StatelessWidget {
   }
 }
 
-class _PerformanceGrid extends StatelessWidget {
+class _PerformanceGrid extends ConsumerWidget {
   const _PerformanceGrid();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final stats = ref.watch(fleetStatsProvider);
+    final onTimeSeries = ref.watch(onTimePerformanceProvider);
+    final attendanceRates = ref.watch(dailyAttendanceRatesProvider);
+
+    // Today's on-time %: last entry in the series, or fleet-derived fallback
+    final todayOnTime = onTimeSeries.isNotEmpty
+        ? '${onTimeSeries.last.onTimePercent.round()}%'
+        : '${stats.onTimePercent}%';
+
+    // Routes completed today = number of routes that have at least one
+    // alighted record (i.e. completed a drop-off)
+    final todayAttendance = attendanceRates.isNotEmpty
+        ? attendanceRates.last
+        : null;
+    final routesCompleted = todayAttendance?.totalCount ?? 0;
+    final attendanceRate = todayAttendance != null
+        ? '${todayAttendance.ratePercent.round()}%'
+        : '—';
+
     return GridView.count(
       crossAxisCount: 2,
       shrinkWrap: true,
@@ -204,29 +227,29 @@ class _PerformanceGrid extends StatelessWidget {
       mainAxisSpacing: AdminUiSpacing.sm,
       crossAxisSpacing: AdminUiSpacing.sm,
       childAspectRatio: 1.7,
-      children: const [
+      children: [
         _MetricCard(
           icon: Icons.check_circle_rounded,
           iconColor: AdminUiColors.onTimeFg,
-          value: '94%',
+          value: todayOnTime,
           label: 'On-Time Performance',
         ),
         _MetricCard(
-          icon: Icons.timer_outlined,
+          icon: Icons.groups_2_rounded,
           iconColor: AdminUiColors.primaryOrange,
-          value: '3.2 min',
-          label: 'Average Delay',
+          value: attendanceRate,
+          label: 'Attendance Rate',
         ),
         _MetricCard(
-          icon: Icons.error_outline_rounded,
-          iconColor: AdminUiColors.delayedFg,
-          value: '5',
-          label: 'Total Incidents',
+          icon: Icons.directions_bus_filled_rounded,
+          iconColor: AdminUiColors.infoFg,
+          value: '${stats.activeBuses}',
+          label: 'Active Buses',
         ),
         _MetricCard(
           icon: Icons.trending_up_rounded,
-          iconColor: AdminUiColors.infoFg,
-          value: '156',
+          iconColor: AdminUiColors.onTimeFg,
+          value: '$routesCompleted',
           label: 'Routes Completed',
         ),
       ],
