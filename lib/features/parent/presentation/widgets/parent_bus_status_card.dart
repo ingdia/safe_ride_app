@@ -1,147 +1,65 @@
 import 'package:flutter/material.dart';
 
+import '../../domain/entities/parent_trip_entity.dart';
 import 'parent_ui_constants.dart';
 
 class ParentBusStatusCard extends StatelessWidget {
-  const ParentBusStatusCard({
-    super.key,
-    required this.childName,
-    required this.busNumber,
-    required this.status,
-    required this.currentStop,
-    required this.nextStop,
-    required this.eta,
-    required this.stopsAway,
-    required this.progress,
-    this.isOnTime = true,
-  });
+  const ParentBusStatusCard({required this.trip, super.key});
 
-  final String childName;
-  final String busNumber;
-  final String status;
-  final String currentStop;
-  final String nextStop;
-  final String eta;
-  final int stopsAway;
-  final double progress;
-  final bool isOnTime;
+  final ParentTripEntity trip;
 
   @override
   Widget build(BuildContext context) {
     return Container(
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [ParentUiColors.orange, ParentUiColors.darkOrange],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(ParentUiRadius.lg),
-        boxShadow: const [
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(26),
+        boxShadow: [
           BoxShadow(
-            color: Color.fromRGBO(0, 0, 0, 0.12),
+            color: Colors.black.withValues(alpha: 0.06),
             blurRadius: 18,
-            offset: Offset(0, 8),
+            offset: const Offset(0, 8),
           ),
         ],
       ),
-      padding: const EdgeInsets.all(ParentUiSpacing.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _Header(
-            busNumber: busNumber,
-            childName: childName,
-            status: status,
-            isOnTime: isOnTime,
+          _BusCardHeader(trip: trip),
+          const SizedBox(height: 18),
+          _LocationRow(
+            icon: Icons.location_on_outlined,
+            title: 'Current stop',
+            value: trip.currentStop,
           ),
-          const SizedBox(height: ParentUiSpacing.md),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(100),
-            child: LinearProgressIndicator(
-              value: progress.clamp(0.0, 1.0),
-              minHeight: 8,
-              backgroundColor: Colors.white.withValues(alpha: 0.35),
-              valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
-            ),
+          const SizedBox(height: 12),
+          _LocationRow(
+            icon: Icons.near_me_outlined,
+            title: 'Next stop',
+            value: trip.nextStop,
           ),
-          const SizedBox(height: ParentUiSpacing.md),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final isSmall = constraints.maxWidth < 330;
-
-              if (isSmall) {
-                return Column(
-                  children: [
-                    _InfoTile(
-                      icon: Icons.location_on_outlined,
-                      title: 'Current stop',
-                      value: currentStop,
-                    ),
-                    const SizedBox(height: ParentUiSpacing.sm),
-                    _InfoTile(
-                      icon: Icons.flag_outlined,
-                      title: 'Next stop',
-                      value: nextStop,
-                    ),
-                    const SizedBox(height: ParentUiSpacing.sm),
-                    _InfoTile(
-                      icon: Icons.schedule_outlined,
-                      title: 'ETA',
-                      value: eta,
-                    ),
-                  ],
-                );
-              }
-
-              return Row(
-                children: [
-                  Expanded(
-                    child: _InfoTile(
-                      icon: Icons.location_on_outlined,
-                      title: 'Current stop',
-                      value: currentStop,
-                    ),
-                  ),
-                  const SizedBox(width: ParentUiSpacing.sm),
-                  Expanded(
-                    child: _InfoTile(
-                      icon: Icons.flag_outlined,
-                      title: 'Next stop',
-                      value: nextStop,
-                    ),
-                  ),
-                  const SizedBox(width: ParentUiSpacing.sm),
-                  Expanded(
-                    child: _InfoTile(
-                      icon: Icons.schedule_outlined,
-                      title: 'ETA',
-                      value: eta,
-                    ),
-                  ),
-                ],
-              );
-            },
+          const SizedBox(height: 16),
+          LinearProgressIndicator(
+            value: trip.progress.clamp(0.0, 1.0),
+            minHeight: 8,
+            borderRadius: BorderRadius.circular(999),
+            backgroundColor: ParentUiColors.orange.withValues(alpha: 0.14),
           ),
-          const SizedBox(height: ParentUiSpacing.md),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(
-              horizontal: ParentUiSpacing.md,
-              vertical: ParentUiSpacing.sm,
-            ),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.18),
-              borderRadius: BorderRadius.circular(ParentUiRadius.md),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
-            ),
-            child: Text(
-              '$stopsAway stops away from your child',
-              textAlign: TextAlign.center,
-              style: ParentUiTextStyles.body.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.w700,
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _SmallInfoBox(title: 'ETA', value: trip.eta),
               ),
-            ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _SmallInfoBox(
+                  title: 'Stops away',
+                  value: '${trip.stopsAway}',
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -149,99 +67,122 @@ class ParentBusStatusCard extends StatelessWidget {
   }
 }
 
-class _Header extends StatelessWidget {
-  const _Header({
-    required this.busNumber,
-    required this.childName,
-    required this.status,
-    required this.isOnTime,
-  });
+class _BusCardHeader extends StatelessWidget {
+  const _BusCardHeader({required this.trip});
 
-  final String busNumber;
-  final String childName;
-  final String status;
-  final bool isOnTime;
+  final ParentTripEntity trip;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
         Container(
-          height: 48,
-          width: 48,
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            shape: BoxShape.circle,
+          height: 54,
+          width: 54,
+          decoration: BoxDecoration(
+            color: ParentUiColors.orange.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(18),
           ),
           child: const Icon(
-            Icons.directions_bus_rounded,
+            Icons.directions_bus_filled,
             color: ParentUiColors.orange,
-            size: 28,
+            size: 30,
           ),
         ),
-        const SizedBox(width: ParentUiSpacing.sm),
+        const SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                busNumber,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: ParentUiTextStyles.heading.copyWith(color: Colors.white),
+                trip.busNumber,
+                style: const TextStyle(
+                  fontSize: 19,
+                  fontWeight: FontWeight.w900,
+                ),
               ),
-              const SizedBox(height: 2),
+              const SizedBox(height: 3),
               Text(
-                childName,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: ParentUiTextStyles.caption.copyWith(
-                  color: Colors.white.withValues(alpha: 0.88),
+                trip.childName,
+                style: TextStyle(
+                  color: Colors.grey.shade700,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ],
           ),
         ),
-        const SizedBox(width: ParentUiSpacing.sm),
-        Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: ParentUiSpacing.sm,
-            vertical: ParentUiSpacing.xs,
-          ),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(100),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                isOnTime ? Icons.check_circle_rounded : Icons.warning_rounded,
-                size: 15,
-                color: isOnTime
-                    ? ParentUiColors.success
-                    : ParentUiColors.warning,
-              ),
-              const SizedBox(width: 4),
-              Text(
-                status,
-                style: ParentUiTextStyles.caption.copyWith(
-                  color: isOnTime
-                      ? ParentUiColors.success
-                      : ParentUiColors.warning,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
-          ),
-        ),
+        _StatusBadge(status: trip.status, label: trip.statusLabel),
       ],
     );
   }
 }
 
-class _InfoTile extends StatelessWidget {
-  const _InfoTile({
+class _StatusBadge extends StatelessWidget {
+  const _StatusBadge({required this.status, required this.label});
+
+  final ParentTripStatus status;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = _statusColors(status);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: colors.background,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: colors.foreground,
+          fontWeight: FontWeight.w800,
+          fontSize: 12,
+        ),
+      ),
+    );
+  }
+
+  _StatusBadgeColors _statusColors(ParentTripStatus status) {
+    switch (status) {
+      case ParentTripStatus.onTime:
+        return _StatusBadgeColors(
+          background: Colors.green.withValues(alpha: 0.12),
+          foreground: Colors.green,
+        );
+      case ParentTripStatus.delayed:
+        return _StatusBadgeColors(
+          background: Colors.orange.withValues(alpha: 0.14),
+          foreground: Colors.orange,
+        );
+      case ParentTripStatus.completed:
+        return _StatusBadgeColors(
+          background: Colors.blue.withValues(alpha: 0.12),
+          foreground: Colors.blue,
+        );
+      case ParentTripStatus.emergency:
+        return _StatusBadgeColors(
+          background: Colors.red.withValues(alpha: 0.12),
+          foreground: Colors.red,
+        );
+    }
+  }
+}
+
+class _StatusBadgeColors {
+  const _StatusBadgeColors({
+    required this.background,
+    required this.foreground,
+  });
+
+  final Color background;
+  final Color foreground;
+}
+
+class _LocationRow extends StatelessWidget {
+  const _LocationRow({
     required this.icon,
     required this.title,
     required this.value,
@@ -253,33 +194,56 @@ class _InfoTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, color: ParentUiColors.orange, size: 22),
+        const SizedBox(width: 10),
+        Text(
+          '$title: ',
+          style: TextStyle(
+            color: Colors.grey.shade700,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(fontWeight: FontWeight.w800),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SmallInfoBox extends StatelessWidget {
+  const _SmallInfoBox({required this.title, required this.value});
+
+  final String title;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(ParentUiSpacing.sm),
+      padding: const EdgeInsets.all(13),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.16),
-        borderRadius: BorderRadius.circular(ParentUiRadius.sm),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+        color: ParentUiColors.orange.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(18),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: Colors.white, size: 18),
-          const SizedBox(height: ParentUiSpacing.xs),
           Text(
             title,
-            style: ParentUiTextStyles.caption.copyWith(
-              color: Colors.white.withValues(alpha: 0.78),
+            style: TextStyle(
+              color: Colors.grey.shade700,
+              fontWeight: FontWeight.w600,
+              fontSize: 12,
             ),
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: 5),
           Text(
             value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: ParentUiTextStyles.body.copyWith(
-              color: Colors.white,
-              fontWeight: FontWeight.w800,
-            ),
+            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
           ),
         ],
       ),
