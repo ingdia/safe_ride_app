@@ -8,9 +8,9 @@ import 'help_support_screen.dart';
 import 'notification_preferences_screen.dart';
 
 void _showComingSoon(BuildContext context, String feature) {
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(content: Text('$feature is coming soon')),
-  );
+  ScaffoldMessenger.of(
+    context,
+  ).showSnackBar(SnackBar(content: Text('$feature is coming soon')));
 }
 
 class ProfileScreen extends ConsumerWidget {
@@ -18,132 +18,157 @@ class ProfileScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final admin = ref.watch(currentAdminProvider);
+    final adminAsync = ref.watch(currentAdminProvider);
+    final admin = adminAsync.value;
 
     return Scaffold(
       backgroundColor: AdminUiColors.scaffoldBackground,
       body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 720),
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.only(bottom: AdminUiSpacing.xl),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const _ProfileHeader(),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      AdminUiSpacing.md,
-                      0,
-                      AdminUiSpacing.md,
-                      AdminUiSpacing.xl,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Transform.translate(
-                          offset: const Offset(0, -28),
-                          child: _ProfileCard(
-                            name: admin.name,
-                            role: 'Fleet Administrator',
-                            email: admin.email,
-                            phone: admin.phone,
-                          ),
-                        ),
-                        const SizedBox(height: AdminUiSpacing.md),
-                        const Text(
-                          'Settings',
-                          style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.w800,
-                            color: AdminUiColors.textPrimary,
-                          ),
-                        ),
-                        const SizedBox(height: AdminUiSpacing.sm),
-                        _SettingsTile(
-                          icon: Icons.notifications_none_rounded,
-                          title: 'Notifications',
-                          subtitle: 'Manage alert preferences',
-                          onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    const NotificationPreferencesScreen(),
-                              ),
-                            );
-                          },
-                        ),
-                        const SizedBox(height: AdminUiSpacing.sm),
-                        _SettingsTile(
-                          icon: Icons.shield_outlined,
-                          title: 'Privacy & Security',
-                          subtitle: 'Review your admin visibility controls',
-                          onTap: () =>
-                              _showComingSoon(context, 'Privacy & Security'),
-                        ),
-                        const SizedBox(height: AdminUiSpacing.sm),
-                        _SettingsTile(
-                          icon: Icons.tune_rounded,
-                          title: 'App Settings',
-                          subtitle: 'Customize your operations workspace',
-                          onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => const AppSettingsScreen(),
-                              ),
-                            );
-                          },
-                        ),
-                        const SizedBox(height: AdminUiSpacing.sm),
-                        _SettingsTile(
-                          icon: Icons.help_outline_rounded,
-                          title: 'Help & Support',
-                          subtitle: 'Get help and contact the SafeRide team',
-                          onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => const HelpSupportScreen(),
-                              ),
-                            );
-                          },
-                        ),
-                        const SizedBox(height: AdminUiSpacing.lg),
-                        SizedBox(
-                          width: double.infinity,
-                          child: OutlinedButton.icon(
-                            onPressed: () => _showComingSoon(context, 'Logout'),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: AdminUiColors.dangerFg,
-                              side: const BorderSide(
-                                color: AdminUiColors.dangerFg,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(
-                                  AdminUiRadii.button,
-                                ),
-                              ),
-                            ),
-                            icon: const Icon(Icons.logout_rounded, size: 18),
-                            label: const Text('Logout & Switch Role'),
-                          ),
-                        ),
-                        const SizedBox(height: AdminUiSpacing.lg),
-                        const Center(
-                          child: Text(
-                            'SafeRide v1.0.0',
-                            style: TextStyle(
-                              color: AdminUiColors.textSecondary,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+        bottom: false,
+        child: adminAsync.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, _) => Center(child: Text('Error: $e')),
+          data: (_) => CustomScrollView(
+            slivers: [
+              SliverToBoxAdapter(
+                child: GradientHeader(
+                  padding: const EdgeInsets.fromLTRB(
+                    AdminUiSpacing.md,
+                    AdminUiSpacing.lg,
+                    AdminUiSpacing.md,
+                    AdminUiSpacing.xl,
                   ),
-                ],
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      const HeaderTitleBlock(
+                        title: 'Profile',
+                        subtitle: 'Manage your account',
+                      ),
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        top: 70,
+                        child: _ProfileCard(
+                          name: admin?.name ?? '',
+                          role: 'Fleet Administrator',
+                          email: admin?.email ?? '',
+                          phone: admin?.phone ?? '',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-            ),
+              const SliverToBoxAdapter(child: SizedBox(height: 200)),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(
+                  AdminUiSpacing.md,
+                  0,
+                  AdminUiSpacing.md,
+                  0,
+                ),
+                sliver: SliverToBoxAdapter(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Settings',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: AdminUiSpacing.sm),
+                      _SettingsTile(
+                        icon: Icons.notifications_none_rounded,
+                        title: 'Notifications',
+                        subtitle: 'Manage alert preferences',
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  const NotificationPreferencesScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: AdminUiSpacing.sm),
+                      _SettingsTile(
+                        icon: Icons.shield_outlined,
+                        title: 'Privacy & Security',
+                        subtitle: 'Update your security settings',
+                        onTap: () =>
+                            _showComingSoon(context, 'Privacy & Security'),
+                      ),
+                      const SizedBox(height: AdminUiSpacing.sm),
+                      _SettingsTile(
+                        icon: Icons.tune_rounded,
+                        title: 'App Settings',
+                        subtitle: 'Customize your experience',
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const AppSettingsScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: AdminUiSpacing.sm),
+                      _SettingsTile(
+                        icon: Icons.help_outline_rounded,
+                        title: 'Help & Support',
+                        subtitle: 'Get help and contact us',
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const HelpSupportScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: AdminUiSpacing.lg),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: () => _showComingSoon(context, 'Logout'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AdminUiColors.dangerFg,
+                            side: const BorderSide(
+                              color: AdminUiColors.dangerFg,
+                            ),
+                          ),
+                          icon: const Icon(Icons.logout_rounded, size: 18),
+                          label: const Text('Logout & Switch Role'),
+                        ),
+                      ),
+                      const SizedBox(height: AdminUiSpacing.lg),
+                      const Center(
+                        child: Column(
+                          children: [
+                            Text(
+                              'SafeRide v1.0.0',
+                              style: TextStyle(
+                                color: AdminUiColors.textSecondary,
+                                fontSize: 12,
+                              ),
+                            ),
+                            Text(
+                              '© 2026 SafeRide Transportation',
+                              style: TextStyle(
+                                color: AdminUiColors.textSecondary,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: AdminUiSpacing.lg),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -390,7 +415,10 @@ class _ContactRow extends StatelessWidget {
         Expanded(
           child: Text(
             text,
-            style: const TextStyle(fontSize: 13, color: AdminUiColors.textPrimary),
+            style: const TextStyle(
+              fontSize: 13,
+              color: AdminUiColors.textPrimary,
+            ),
           ),
         ),
       ],

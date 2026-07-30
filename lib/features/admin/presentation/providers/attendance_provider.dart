@@ -1,63 +1,22 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../../core/firebase/firebase_providers.dart';
 import '../../data/models/attendance_model.dart';
-import '../../data/models/student_model.dart';
-import 'students_provider.dart';
+import '../../data/repositories/attendance_repository.dart';
+import 'routes_provider.dart';
 
-String _busIdForRoute(String routeId) {
-  switch (routeId) {
-    case 'route-a':
-      return 'bus-12';
-    case 'route-b':
-      return 'bus-07';
-    case 'route-c':
-      return 'bus-15';
-    case 'route-d':
-      return 'bus-03';
-    default:
-      return 'bus-12';
-  }
-}
+final attendanceRepositoryProvider = Provider<AttendanceRepository>((ref) {
+  return AttendanceRepository(ref.watch(firestoreProvider));
+});
 
-String _isoDate(DateTime date) {
-  final year = date.year.toString().padLeft(4, '0');
-  final month = date.month.toString().padLeft(2, '0');
-  final day = date.day.toString().padLeft(2, '0');
-  return '$year-$month-$day';
-}
+final attendanceProvider = StreamProvider<List<AttendanceModel>>((ref) async* {
+  final routes = ref.watch(routesListProvider);
+  final routeIds = routes.map((r) => r.routeId).toList();
+  yield* ref.read(attendanceRepositoryProvider).streamLast7Days(routeIds);
+});
 
-List<AttendanceModel> _buildSeedAttendance(List<StudentModel> students) {
-  final today = DateTime.now();
-  final absentSlots = <String>{'2-3', '4-1', '0-6', '3-2', '5-0'};
-  final records = <AttendanceModel>[];
-
-  for (var dayOffset = 6; dayOffset >= 0; dayOffset--) {
-    final day = today.subtract(Duration(days: dayOffset));
-    final dateString = _isoDate(day);
-
-    for (var i = 0; i < students.length; i++) {
-      final student = students[i];
-      final isAbsent = absentSlots.contains('$i-$dayOffset');
-      records.add(
-        AttendanceModel(
-          attendanceId: 'att-$dayOffset-${student.studentId}',
-          studentId: student.studentId,
-          routeId: student.routeId,
-          busId: _busIdForRoute(student.routeId),
-          status:
-              isAbsent ? AttendanceStatus.absent : AttendanceStatus.boarded,
-          date: dateString,
-          timestamp: DateTime(day.year, day.month, day.day, 7, 30),
-          recordedBy: 'user-admin-1',
-        ),
-      );
-    }
-  }
-  return records;
-}
-
-final attendanceProvider = Provider<List<AttendanceModel>>((ref) {
-  final students = ref.watch(studentsProvider);
-  return _buildSeedAttendance(students);
+final attendanceListProvider = Provider<List<AttendanceModel>>((ref) {
+  return ref.watch(attendanceProvider).value ?? [];
 });
 
 class DailyAttendanceRate {
@@ -74,9 +33,8 @@ class DailyAttendanceRate {
   });
 }
 
-final dailyAttendanceRatesProvider =
-    Provider<List<DailyAttendanceRate>>((ref) {
-  final records = ref.watch(attendanceProvider);
+final dailyAttendanceRatesProvider = Provider<List<DailyAttendanceRate>>((ref) {
+  final records = ref.watch(attendanceListProvider);
   final byDate = <String, List<AttendanceModel>>{};
 
   for (final record in records) {
@@ -88,7 +46,7 @@ final dailyAttendanceRatesProvider =
   return sortedDates.map((date) {
     final dayRecords = byDate[date]!;
     final present =
-        dayRecords.where((r) => r.status != AttendanceStatus.absent).length;
+        dayRecords.where((r) => r.status == AttendanceStatus.boarded).length;
     final total = dayRecords.length;
     final rate = total == 0 ? 0.0 : (present / total) * 100;
     return DailyAttendanceRate(

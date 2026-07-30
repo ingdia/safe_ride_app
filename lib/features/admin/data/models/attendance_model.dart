@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 enum AttendanceStatus { boarded, alighted, absent }
 
 extension AttendanceStatusX on AttendanceStatus {
@@ -9,6 +11,17 @@ extension AttendanceStatusX on AttendanceStatus {
         return 'alighted';
       case AttendanceStatus.absent:
         return 'absent';
+    }
+  }
+
+  static AttendanceStatus fromString(String? s) {
+    switch (s) {
+      case 'boarded':
+        return AttendanceStatus.boarded;
+      case 'alighted':
+        return AttendanceStatus.alighted;
+      default:
+        return AttendanceStatus.absent;
     }
   }
 }
@@ -33,4 +46,19 @@ class AttendanceModel {
     required this.timestamp,
     required this.recordedBy,
   });
+
+  factory AttendanceModel.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    return AttendanceModel(
+      attendanceId: doc.id,
+      studentId: data['student_id'] as String? ?? '',
+      routeId: data['route_id'] as String? ?? '',
+      busId: data['bus_id'] as String? ?? '',
+      status: AttendanceStatusX.fromString(data['status'] as String?),
+      date: data['date'] as String? ?? '',
+      timestamp:
+          (data['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      recordedBy: data['recorded_by'] as String? ?? '',
+    );
+  }
 }
