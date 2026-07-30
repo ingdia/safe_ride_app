@@ -100,16 +100,23 @@ class _AppBottomNavBar extends StatelessWidget {
             horizontal: ParentUiSpacing.sm,
             vertical: ParentUiSpacing.sm,
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: List.generate(
-              items.length,
-              (index) => _NavBarItem(
-                item: items[index],
-                isSelected: selectedIndex == index,
-                onTap: () => onTabSelected(index),
-              ),
-            ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final showLabels = constraints.maxWidth / items.length >= 80;
+              return Row(
+                children: List.generate(
+                  items.length,
+                  (index) => Expanded(
+                    child: _NavBarItem(
+                      item: items[index],
+                      isSelected: selectedIndex == index,
+                      showLabel: showLabels,
+                      onTap: () => onTabSelected(index),
+                    ),
+                  ),
+                ),
+              );
+            },
           ),
         ),
       ),
@@ -125,11 +132,13 @@ class _NavBarItem extends StatelessWidget {
   const _NavBarItem({
     required this.item,
     required this.isSelected,
+    required this.showLabel,
     required this.onTap,
   });
 
   final AppNavItem item;
   final bool isSelected;
+  final bool showLabel;
   final VoidCallback onTap;
 
   @override
@@ -164,9 +173,7 @@ class _NavBarItem extends StatelessWidget {
                   child: Icon(
                     isSelected ? item.activeIcon : item.icon,
                     key: ValueKey(isSelected),
-                    color: isSelected
-                        ? ParentUiColors.orange
-                        : ParentUiColors.textGrey,
+                    color: isSelected ? ParentUiColors.orange : ParentUiColors.textGrey,
                     size: 24,
                   ),
                 ),
@@ -196,26 +203,28 @@ class _NavBarItem extends StatelessWidget {
                   ),
               ],
             ),
-            // Animated label that slides in when selected
-            AnimatedSize(
-              duration: const Duration(milliseconds: 280),
-              curve: Curves.easeInOut,
-              child: isSelected
-                  ? Row(
-                      children: [
-                        const SizedBox(width: ParentUiSpacing.xs),
-                        Text(
-                          item.label,
-                          style: ParentUiTextStyles.caption.copyWith(
-                            color: ParentUiColors.orange,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 13,
+            if (showLabel)
+              AnimatedSize(
+                duration: const Duration(milliseconds: 280),
+                curve: Curves.easeInOut,
+                child: isSelected
+                    ? Padding(
+                        padding: const EdgeInsets.only(left: ParentUiSpacing.xs),
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 90),
+                          child: Text(
+                            item.label,
+                            overflow: TextOverflow.ellipsis,
+                            style: ParentUiTextStyles.caption.copyWith(
+                              color: ParentUiColors.orange,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 13,
+                            ),
                           ),
                         ),
-                      ],
-                    )
-                  : const SizedBox.shrink(),
-            ),
+                      )
+                    : const SizedBox.shrink(),
+              ),
           ],
         ),
       ),

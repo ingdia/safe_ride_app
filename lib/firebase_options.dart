@@ -41,50 +41,46 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyB-YD23-5wnQuXtxlDQwhedgIBG55mbq58',
-    appId: '1:978345093220:web:b72056a0bbc027aaca9771',
-    messagingSenderId: '978345093220',
-    projectId: 'safe-ride-b6af5',
-    authDomain: 'safe-ride-b6af5.firebaseapp.com',
-    storageBucket: 'safe-ride-b6af5.firebasestorage.app',
-    measurementId: 'G-XZZT2JPZ0N',
+    apiKey: 'AIzaSyAYQ8MMzTZwb3Uh3ch36sR_KiUjqiKbNC8',
+    appId: '1:860734666404:web:67f60d9c87f2fad5639831',
+    messagingSenderId: '860734666404',
+    projectId: 'safe-ride-app-5733f',
+    authDomain: 'safe-ride-app-5733f.firebaseapp.com',
+    storageBucket: 'safe-ride-app-5733f.firebasestorage.app',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyDxwOy5Rn9giSlw3eoT8D7J2azHMFDj6EU',
-    appId: '1:978345093220:android:ce1688afb5b6a8b8ca9771',
-    messagingSenderId: '978345093220',
-    projectId: 'safe-ride-b6af5',
-    storageBucket: 'safe-ride-b6af5.firebasestorage.app',
+    apiKey: 'AIzaSyDnp3j72ieq9aWEZCqj3KOONX9whWBKODI',
+    appId: '1:860734666404:android:936a268bd90b7b51639831',
+    messagingSenderId: '860734666404',
+    projectId: 'safe-ride-app-5733f',
+    storageBucket: 'safe-ride-app-5733f.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyCXtgOhX09BNSmuoa7R8GCrR_f8ghBcdW0',
-    appId: '1:978345093220:ios:3968cde095cde9d1ca9771',
-    messagingSenderId: '978345093220',
-    projectId: 'safe-ride-b6af5',
-    storageBucket: 'safe-ride-b6af5.firebasestorage.app',
-    iosClientId: '978345093220-5nfsabi6mglp50rbt7oqqfgb6971q75o.apps.googleusercontent.com',
+    apiKey: 'AIzaSyAKO4D1XpbFh5hSDTuxeEg3J4IcbWpodqw',
+    appId: '1:860734666404:ios:28cbf0cb09ddd467639831',
+    messagingSenderId: '860734666404',
+    projectId: 'safe-ride-app-5733f',
+    storageBucket: 'safe-ride-app-5733f.firebasestorage.app',
     iosBundleId: 'com.example.safeRideApp',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyCXtgOhX09BNSmuoa7R8GCrR_f8ghBcdW0',
-    appId: '1:978345093220:ios:3968cde095cde9d1ca9771',
-    messagingSenderId: '978345093220',
-    projectId: 'safe-ride-b6af5',
-    storageBucket: 'safe-ride-b6af5.firebasestorage.app',
-    iosClientId: '978345093220-5nfsabi6mglp50rbt7oqqfgb6971q75o.apps.googleusercontent.com',
+    apiKey: 'AIzaSyAKO4D1XpbFh5hSDTuxeEg3J4IcbWpodqw',
+    appId: '1:860734666404:ios:28cbf0cb09ddd467639831',
+    messagingSenderId: '860734666404',
+    projectId: 'safe-ride-app-5733f',
+    storageBucket: 'safe-ride-app-5733f.firebasestorage.app',
     iosBundleId: 'com.example.safeRideApp',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'AIzaSyB-YD23-5wnQuXtxlDQwhedgIBG55mbq58',
-    appId: '1:978345093220:web:9617c2011a0075f5ca9771',
-    messagingSenderId: '978345093220',
-    projectId: 'safe-ride-b6af5',
-    authDomain: 'safe-ride-b6af5.firebaseapp.com',
-    storageBucket: 'safe-ride-b6af5.firebasestorage.app',
-    measurementId: 'G-NR951REQB7',
+    apiKey: 'AIzaSyAYQ8MMzTZwb3Uh3ch36sR_KiUjqiKbNC8',
+    appId: '1:860734666404:web:26f94293b12b1ec3639831',
+    messagingSenderId: '860734666404',
+    projectId: 'safe-ride-app-5733f',
+    authDomain: 'safe-ride-app-5733f.firebaseapp.com',
+    storageBucket: 'safe-ride-app-5733f.firebasestorage.app',
   );
 }

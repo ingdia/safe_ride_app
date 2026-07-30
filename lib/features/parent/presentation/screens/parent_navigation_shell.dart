@@ -48,9 +48,9 @@ class ParentNavigationShell extends ConsumerWidget {
     return AppNavigationShell(
       selectedIndex: selectedIndex,
       onTabSelected: (index) {
-        ref.read(parentNavigationProvider.notifier).selectTab(
-          parentTabFromIndex(index),
-        );
+        ref
+            .read(parentNavigationProvider.notifier)
+            .selectTab(parentTabFromIndex(index));
       },
       items: _items,
       child: IndexedStack(index: selectedIndex, children: _screens),

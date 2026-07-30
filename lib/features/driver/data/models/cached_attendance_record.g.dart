@@ -14,6 +14,7 @@ class CachedAttendanceRecordAdapter extends TypeAdapter<CachedAttendanceRecord> 
       statusIndex: reader.readInt(),
       recordedAt: DateTime.fromMillisecondsSinceEpoch(reader.readInt()),
       synced: reader.readBool(),
+      routeId: reader.readString(),
     );
   }
 
@@ -25,5 +26,6 @@ class CachedAttendanceRecordAdapter extends TypeAdapter<CachedAttendanceRecord> 
     writer.writeInt(obj.statusIndex);
     writer.writeInt(obj.recordedAt.millisecondsSinceEpoch);
     writer.writeBool(obj.synced);
+    writer.writeString(obj.routeId);
   }
 }

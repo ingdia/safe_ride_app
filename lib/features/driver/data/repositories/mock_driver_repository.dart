@@ -93,8 +93,10 @@ class MockDriverRepository implements DriverRepository {
   @override
   Future<Student> updateStudentAttendanceStatus(
     String studentId,
-    AttendanceStatus status,
-  ) async {
+    AttendanceStatus status, {
+    String? routeId,
+    String? busId,
+  }) async {
     final index = _students.indexWhere((student) => student.id == studentId);
     if (index == -1) {
       throw StateError('Student not found: $studentId');
@@ -103,5 +105,17 @@ class MockDriverRepository implements DriverRepository {
     final updatedStudent = _students[index].copyWith(status: status);
     _students[index] = updatedStudent;
     return updatedStudent;
+  }
+
+  @override
+  Future<void> updateBusLocation(
+    double latitude,
+    double longitude, {
+    String? routeId,
+    String? busId,
+  }) async {
+    // Mock repository does not persist GPS updates, but the interface is
+    // supported for testing and provider flow.
+    return;
   }
 }
