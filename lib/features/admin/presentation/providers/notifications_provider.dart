@@ -70,6 +70,22 @@ final _activityFeedProvider = Provider<List<NotificationModel>>((ref) {
         isRead: false,
         timestamp: trip.startedAt!,
       ));
+
+      // No per-stop timestamp is stored (trips.stopsCompleted is just a
+      // name list) — using "now" keeps these visible near the top of the
+      // feed while the trip is active, consistent with the pending/assigned
+      // items above which are also recomputed live rather than timestamped.
+      for (final stopName in trip.stopsCompleted) {
+        items.add(NotificationModel(
+          notificationId: 'stop-passed-${trip.id}-$stopName',
+          recipientId: 'admin',
+          type: NotificationType.general,
+          message: 'Bus ${trip.busId} passed $stopName.',
+          relatedId: trip.id,
+          isRead: false,
+          timestamp: DateTime.now(),
+        ));
+      }
     } else if (trip.status == TripStatus.completed && trip.completedAt != null) {
       items.add(NotificationModel(
         notificationId: 'trip-completed-${trip.id}',

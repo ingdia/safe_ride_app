@@ -279,19 +279,39 @@ class FirestoreParentRepository implements ParentRepository {
 
     final isCompleted = trip.status == TripStatus.completed;
 
+    // The driver explicitly marking a stop as passed is more trustworthy
+    // than the GPS-proximity guess — prefer it once the driver has started
+    // confirming stops; fall back to the GPS heuristic only before that.
+    final confirmedStops = trip.stopsCompleted.toSet();
+    final hasConfirmations = confirmedStops.isNotEmpty;
+    var currentIndex = eta.nearestStopIndex;
+    if (hasConfirmations) {
+      final firstUnconfirmed = stops.indexWhere((s) => !confirmedStops.contains(s.name));
+      currentIndex = firstUnconfirmed == -1 ? stops.length - 1 : firstUnconfirmed;
+    }
+
     final routeStops = <ParentRouteStopEntity>[
       for (var i = 0; i < stops.length; i++)
         ParentRouteStopEntity(
           id: '$i',
           name: stops[i].name,
           position: i,
-          status: isCompleted || i < eta.nearestStopIndex
+          status: isCompleted || confirmedStops.contains(stops[i].name) || (!hasConfirmations && i < currentIndex)
               ? ParentRouteStopStatus.completed
-              : i == eta.nearestStopIndex
+              : i == currentIndex
                   ? ParentRouteStopStatus.current
                   : ParentRouteStopStatus.upcoming,
         ),
     ];
+
+    final hasCurrentIndex = currentIndex >= 0 && currentIndex < stops.length;
+    final currentStopName = hasCurrentIndex ? stops[currentIndex].name : eta.currentStopName;
+    final nextIndex = currentIndex + 1 < stops.length ? currentIndex + 1 : currentIndex;
+    final nextStopName =
+        hasCurrentIndex && nextIndex < stops.length ? stops[nextIndex].name : eta.nextStopName;
+    final stopsAwayCount = !hasCurrentIndex
+        ? eta.stopsAway
+        : (stops.length - 1 - currentIndex).clamp(0, stops.length);
 
     return ParentTripEntity(
       tripId: trip.id,
@@ -300,11 +320,13 @@ class FirestoreParentRepository implements ParentRepository {
       grade: student.grade,
       busNumber: student.busNumber ?? 'Bus',
       driverName: student.driverName ?? 'Driver',
-      currentStop: eta.currentStopName,
-      nextStop: eta.nextStopName,
+      currentStop: currentStopName,
+      nextStop: nextStopName,
       eta: isCompleted ? 'Arrived' : eta.etaLabel,
-      stopsAway: eta.stopsAway,
-      progress: isCompleted ? 1.0 : eta.progress,
+      stopsAway: stopsAwayCount,
+      progress: isCompleted
+          ? 1.0
+          : (stops.length <= 1 ? eta.progress : (currentIndex / (stops.length - 1)).clamp(0.0, 1.0)),
       status: isCompleted ? ParentTripStatus.completed : ParentTripStatus.onTime,
       routeStops: routeStops,
       busLatitude: location?.lat,
