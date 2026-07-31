@@ -3,10 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/route_summary_provider.dart';
 import '../providers/routes_provider.dart';
 import '../providers/schools_provider.dart';
+import '../widgets/admin_notification_bell.dart';
 import '../widgets/admin_ui_constants.dart';
 import '../widgets/gradient_header.dart';
 import '../widgets/round_icon_button.dart';
 import '../widgets/route_form_sheet.dart';
+import 'admin_map_screen.dart';
+import 'admin_trips_screen.dart';
 
 class ManageRoutesScreen extends ConsumerWidget {
   const ManageRoutesScreen({super.key});
@@ -86,10 +89,52 @@ class ManageRoutesScreen extends ConsumerWidget {
                   AdminUiSpacing.md,
                   AdminUiSpacing.lg,
                 ),
-                child: HeaderTitleBlock(
-                  title: 'Manage Routes',
-                  subtitle: 'Configure and organize bus routes',
-                  onBack: () => Navigator.of(context).pop(),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Expanded(
+                      child: HeaderTitleBlock(
+                        title: 'Routes',
+                        subtitle: 'Configure routes, track buses, review trips',
+                      ),
+                    ),
+                    const AdminNotificationBell(),
+                  ],
+                ),
+              ),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(
+                AdminUiSpacing.md,
+                AdminUiSpacing.md,
+                AdminUiSpacing.md,
+                0,
+              ),
+              sliver: SliverToBoxAdapter(
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _QuickLinkCard(
+                        icon: Icons.map_rounded,
+                        label: 'Live Map',
+                        subtitle: 'Track all buses',
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute(builder: (_) => const LiveMapScreen()),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: AdminUiSpacing.sm),
+                    Expanded(
+                      child: _QuickLinkCard(
+                        icon: Icons.route_rounded,
+                        label: 'Trips',
+                        subtitle: 'Active & completed',
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute(builder: (_) => const AdminTripsScreen()),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -309,6 +354,56 @@ class _StatItem extends StatelessWidget {
           style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
         ),
       ],
+    );
+  }
+}
+
+class _QuickLinkCard extends StatelessWidget {
+  const _QuickLinkCard({
+    required this.icon,
+    required this.label,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AdminUiRadii.card),
+        child: Container(
+          padding: const EdgeInsets.all(AdminUiSpacing.md),
+          decoration: BoxDecoration(
+            color: AdminUiColors.cardBackground,
+            borderRadius: BorderRadius.circular(AdminUiRadii.card),
+            border: Border.all(color: AdminUiColors.borderSubtle),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: AdminUiColors.statCardBackground,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: AdminUiColors.primaryOrange, size: 18),
+              ),
+              const SizedBox(height: AdminUiSpacing.sm),
+              Text(label, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+              Text(subtitle, style: const TextStyle(color: AdminUiColors.textSecondary, fontSize: 11.5)),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

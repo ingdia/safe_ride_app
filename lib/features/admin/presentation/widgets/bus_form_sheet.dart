@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/bus_model.dart';
-import '../../data/models/user_model.dart';
 import '../providers/users_provider.dart';
 import 'admin_ui_constants.dart';
 
@@ -56,10 +55,7 @@ class _BusFormSheetState extends ConsumerState<BusFormSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final drivers = ref
-        .watch(usersProvider)
-        .where((u) => u.role == UserRole.driver)
-        .toList();
+    final drivers = ref.watch(driversProvider);
     final isEditing = widget.existingBus != null;
     final validDriverId = drivers.any((d) => d.userId == _selectedDriverId)
         ? _selectedDriverId
