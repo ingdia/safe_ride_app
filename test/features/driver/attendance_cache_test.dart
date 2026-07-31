@@ -50,7 +50,7 @@ void main() {
       await cache.saveRecord(_makeRecord('s1', AttendanceStatus.boarded));
       final loaded = await cache.loadAll();
       expect(
-        () => (loaded as Map<String, CachedAttendanceRecord>)['s2'] =
+        () => (loaded as Map<String, CachedAttendanceRecord>)['s2'] = // ignore: unnecessary_cast
             _makeRecord('s2', AttendanceStatus.absent),
         throwsUnsupportedError,
       );

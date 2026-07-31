@@ -42,15 +42,15 @@ final driverAlertsStreamProvider =
   return ref.watch(driverStreamServiceProvider).alertsStream(routeId);
 });
 
-/// Exposes a live [Stream] of [Student]s assigned to [routeId].
+/// Exposes a live [Stream] of [Student]s assigned to [busId].
 ///
 /// Re-emits on every Admin roster change (add / remove student) so
 /// [StudentAttendanceScreen] reflects mid-trip edits without a manual refresh.
-/// Emits an empty list when [routeId] is empty or no students match.
+/// Emits an empty list when [busId] is empty or no students match.
 final studentRosterStreamProvider =
-    StreamProvider.family<List<Student>, String>((ref, routeId) {
-  if (routeId.isEmpty) return const Stream.empty();
-  return ref.watch(driverStreamServiceProvider).studentsStream(routeId);
+    StreamProvider.family<List<Student>, String>((ref, busId) {
+  if (busId.isEmpty) return const Stream.empty();
+  return ref.watch(driverStreamServiceProvider).studentsStream(busId);
 });
 final driverRouteProvider = AsyncNotifierProvider<DriverRouteNotifier, DriverRouteState>(
   DriverRouteNotifier.new,
@@ -91,7 +91,7 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
 
   @override
   FutureOr<DriverRouteState> build() async {
-    ref.listen<AsyncValue<bool>>(connectivityProvider, (previous, next) {
+    ref.listen<AsyncValue<bool>>(connectivityProvider, (_, next) {
       final isOnline = next.maybeWhen(data: (value) => value, orElse: () => false);
       _online = isOnline;
       if (isOnline) {
@@ -102,7 +102,7 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
     _online = ref.read(connectivityProvider).when(
       data: (v) => v,
       loading: () => false,
-      error: (_, __) => false,
+      error: (error, stackTrace) => false,
     );
 
     ref.onDispose(() => _gpsTimer?.cancel());
@@ -270,7 +270,7 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
     final isOnline = ref.read(connectivityProvider).when(
           data: (v) => v,
           loading: () => _online,
-          error: (_, __) => false,
+          error: (error, stackTrace) => false,
         );
 
     state = const AsyncLoading<DriverRouteState>();
@@ -480,7 +480,7 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
       if (!await Geolocator.isLocationServiceEnabled()) return;
 
       final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high), // ignore: deprecated_member_use
       );
       await updateBusLocation(latitude: position.latitude, longitude: position.longitude);
     } catch (_) {

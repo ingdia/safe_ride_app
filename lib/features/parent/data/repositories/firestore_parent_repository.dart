@@ -200,8 +200,12 @@ class FirestoreParentRepository implements ParentRepository {
       // "not started" the instant it ends. This is what lets a parent see
       // across the whole day: morning pickup -> school, then later
       // school -> home, rather than only a snapshot of "right now."
+      // The `trips` rule gates reads on `schoolId`, so it must be an
+      // explicit filter here too — filtering by `busId` alone is rejected
+      // outright by Firestore, not just empty.
       return _firestore
           .collection(FirebaseCollections.trips)
+          .where('schoolId', isEqualTo: student.schoolId)
           .where('busId', isEqualTo: student.busId)
           .limit(20)
           .snapshots()

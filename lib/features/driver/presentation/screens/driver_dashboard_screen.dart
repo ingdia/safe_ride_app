@@ -26,14 +26,18 @@ final _recentTripsProvider = FutureProvider.autoDispose<List<TripEntity>>((ref) 
   final firestore = FirebaseFirestore.instance;
   final userDoc = await firestore.collection(FirebaseCollections.users).doc(uid).get();
   final busId = userDoc.data()?['busId'] as String?;
-  if (busId == null || busId.isEmpty) return const [];
+  final schoolId = userDoc.data()?['schoolId'] as String?;
+  if (busId == null || busId.isEmpty || schoolId == null || schoolId.isEmpty) return const [];
 
-  // Sorted client-side rather than via orderBy() — multiple equality (==)
-  // filters alone don't need a composite index in Firestore, but adding
-  // orderBy on a different field would, and that index isn't guaranteed to
-  // exist/deployed.
+  // The `trips` rule gates reads on `schoolId`, so it must be an explicit
+  // filter here too — filtering by `busId` alone is rejected outright by
+  // Firestore, not just empty. Sorted client-side rather than via
+  // orderBy() — multiple equality (==) filters alone don't need a
+  // composite index in Firestore, but adding orderBy on a different field
+  // would, and that index isn't guaranteed to exist/deployed.
   final tripsQuery = await firestore
       .collection(FirebaseCollections.trips)
+      .where('schoolId', isEqualTo: schoolId)
       .where('busId', isEqualTo: busId)
       .where('status', isEqualTo: 'completed')
       .limit(30)

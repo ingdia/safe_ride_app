@@ -37,18 +37,24 @@ final driverProfileProvider = StreamProvider<DriverProfile>((ref) {
   return firestore.collection(FirebaseCollections.users).doc(uid).snapshots().asyncMap((doc) async {
     final data = doc.data() ?? {};
     final busId = data['busId'] as String?;
+    final schoolId = data['schoolId'] as String?;
 
     String busNumber = 'Unassigned';
     String routeName = 'No route assigned';
 
-    if (busId != null && busId.isNotEmpty) {
+    if (busId != null && busId.isNotEmpty && schoolId != null && schoolId.isNotEmpty) {
       final busDoc = await firestore.collection(FirebaseCollections.buses).doc(busId).get();
       if (busDoc.exists) {
         busNumber = busDoc.data()?['plateNumber'] as String? ?? busId;
       }
 
+      // The `routes` security rule gates reads on `schoolId`, so any list
+      // query against this collection must filter on `schoolId` too, or
+      // Firestore rejects the whole query as unprovable — filtering by
+      // `busId` alone here would permission-deny silently.
       final routeQuery = await firestore
           .collection(FirebaseCollections.routes)
+          .where('schoolId', isEqualTo: schoolId)
           .where('busId', isEqualTo: busId)
           .limit(1)
           .get();

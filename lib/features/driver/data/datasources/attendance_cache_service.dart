@@ -78,9 +78,14 @@ class AttendanceCacheService {
           final routeDoc =
               await fs.collection(FirebaseCollections.routes).doc(record.routeId).get();
           final busId = routeDoc.data()?['busId'] as String?;
-          if (busId != null && busId.isNotEmpty) {
+          final schoolId = routeDoc.data()?['schoolId'] as String?;
+          if (busId != null && busId.isNotEmpty && schoolId != null && schoolId.isNotEmpty) {
+            // The `trips` rule gates reads on `schoolId`, so it must be an
+            // explicit filter here too — filtering by `busId` alone is
+            // rejected outright by Firestore, not just empty.
             final tripQuery = await fs
                 .collection(FirebaseCollections.trips)
+                .where('schoolId', isEqualTo: schoolId)
                 .where('busId', isEqualTo: busId)
                 .where('status', isEqualTo: 'inProgress')
                 .limit(1)

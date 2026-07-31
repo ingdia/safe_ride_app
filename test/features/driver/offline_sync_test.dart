@@ -201,9 +201,16 @@ void main() {
           .collection('students')
           .doc('s1')
           .set({'name': 'Alice', 'status': 'approved'});
-      await fakeFs.collection(FirebaseCollections.routes).doc('r1').set({'busId': 'bus_1'});
+      // schoolId seeded on the route doc — AttendanceCacheService.syncOfflineData
+      // filters the trips query by schoolId too, since the `trips` security
+      // rule gates reads on it and a query missing that filter is rejected.
+      await fakeFs
+          .collection(FirebaseCollections.routes)
+          .doc('r1')
+          .set({'busId': 'bus_1', 'schoolId': 'school_1'});
       final tripRef = await fakeFs.collection(FirebaseCollections.trips).add({
         'busId': 'bus_1',
+        'schoolId': 'school_1',
         'routeId': 'r1',
         'status': 'inProgress',
         'studentEvents': <String, dynamic>{},

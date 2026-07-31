@@ -95,6 +95,7 @@ void main() {
       addTearDown(container.dispose);
 
       final loaded = await container.read(driverRouteProvider.future) as DriverRouteLoaded;
+      // ignore: avoid_print
       print('loaded statuses: ${loaded.students.map((s) => '${s.id}:${s.status}').join(', ')}');
       expect(loaded.students.firstWhere((s) => s.id == 's2').status, AttendanceStatus.absent);
       expect((await cache.loadAll()).isEmpty, isTrue);

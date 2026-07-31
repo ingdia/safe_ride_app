@@ -121,10 +121,10 @@ class MockDriverRepository implements DriverRepository {
   }
 
   @override
-  Future<String?> findActiveTripId({required String busId}) async => null;
+  Future<String?> findActiveTripId({required String busId, String? schoolId}) async => null;
 
   @override
-  Future<String> startTrip({required String busId, required String routeId}) async {
+  Future<String> startTrip({required String busId, required String routeId, String? schoolId}) async {
     return 'mock-trip-${DateTime.now().millisecondsSinceEpoch}';
   }
 

@@ -32,9 +32,13 @@ void main() {
   group('startTrip / findActiveTripId / endTrip', () {
     const busId = 'bus_001';
     const routeId = 'route_001';
+    // findActiveTripId/startTrip filter on schoolId (the `trips` security
+    // rule gates reads on it, so the query must too) — passed explicitly
+    // here since this group deliberately runs without a signed-in driver.
+    const schoolId = 'school_001';
 
     test('startTrip creates an inProgress trips document', () async {
-      final tripId = await repository.startTrip(busId: busId, routeId: routeId);
+      final tripId = await repository.startTrip(busId: busId, routeId: routeId, schoolId: schoolId);
 
       final doc = await fakeFirestore.collection(FirebaseCollections.trips).doc(tripId).get();
       expect(doc.exists, isTrue);
@@ -44,8 +48,8 @@ void main() {
     });
 
     test('startTrip resumes an already-active trip instead of creating a new one', () async {
-      final firstId = await repository.startTrip(busId: busId, routeId: routeId);
-      final secondId = await repository.startTrip(busId: busId, routeId: routeId);
+      final firstId = await repository.startTrip(busId: busId, routeId: routeId, schoolId: schoolId);
+      final secondId = await repository.startTrip(busId: busId, routeId: routeId, schoolId: schoolId);
 
       expect(secondId, firstId);
       final snap = await fakeFirestore
@@ -56,12 +60,12 @@ void main() {
     });
 
     test('findActiveTripId returns null when no trip is in progress', () async {
-      final tripId = await repository.findActiveTripId(busId: busId);
+      final tripId = await repository.findActiveTripId(busId: busId, schoolId: schoolId);
       expect(tripId, isNull);
     });
 
     test('endTrip marks the trip completed', () async {
-      final tripId = await repository.startTrip(busId: busId, routeId: routeId);
+      final tripId = await repository.startTrip(busId: busId, routeId: routeId, schoolId: schoolId);
       await repository.endTrip(tripId);
 
       final doc = await fakeFirestore.collection(FirebaseCollections.trips).doc(tripId).get();
@@ -69,7 +73,7 @@ void main() {
       expect(doc.data()!.containsKey('completedAt'), isTrue);
 
       // No longer discoverable as the active trip.
-      expect(await repository.findActiveTripId(busId: busId), isNull);
+      expect(await repository.findActiveTripId(busId: busId, schoolId: schoolId), isNull);
     });
   });
 
