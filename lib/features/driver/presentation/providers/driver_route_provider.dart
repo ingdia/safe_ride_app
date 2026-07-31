@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
 
 import '../../../../shared/providers/attendance_cache_provider.dart';
 import '../../../../shared/providers/connectivity_provider.dart';
@@ -83,7 +84,10 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
   late DriverRepository _repository;
   String? _routeId;
   String? _busId;
+  String? _tripId;
   bool _online = true;
+  Timer? _gpsTimer;
+  Set<String> _stopsCompleted = {};
 
   @override
   FutureOr<DriverRouteState> build() async {
@@ -100,6 +104,8 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
       loading: () => false,
       error: (_, __) => false,
     );
+
+    ref.onDispose(() => _gpsTimer?.cancel());
 
     if (!ref.mounted) return const DriverRouteInitial();
     return _loadRoute(isOnline: _online);
@@ -143,12 +149,15 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
         stops: currentState.stops,
         students: mergedStudents,
         routeId: _routeId,
+        busId: _busId,
+        tripId: _tripId,
         routeProgress: progress,
         gpsStatus: _gpsStatusFor(
           progress: progress,
           lastGpsUpdateAt: currentState.lastGpsUpdateAt,
         ),
         lastGpsUpdateAt: currentState.lastGpsUpdateAt,
+        stopsCompleted: _stopsCompleted,
       ),
     );
   }
@@ -169,9 +178,30 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
         stops = <RouteStop>[];
         students = <Student>[];
       }
-    }
 
-    if (stops.isEmpty || students.isEmpty) {
+      // Real, empty data (e.g. the admin hasn't finished setting up this
+      // bus's route/stops, or approved any students on it yet) is a
+      // legitimate state — it must NOT fall back to mock data, or the
+      // driver would see fake stops/students no matter what's actually in
+      // Firestore, with no way to tell it's fake. DriverRouteLoaded and its
+      // screens handle empty stops/students as a real "not set up yet"
+      // state instead.
+      if (_repository is FirestoreDriverRepository) {
+        final metadata = await (_repository as FirestoreDriverRepository).fetchRouteMetadata();
+        _routeId = metadata['routeId'];
+        _busId = metadata['busId'];
+        if (_busId != null && _busId!.isNotEmpty) {
+          _tripId = await repository.findActiveTripId(busId: _busId!);
+          if (_tripId != null) {
+            _startGpsBroadcast();
+            _stopsCompleted = (await repository.fetchStopsCompleted(_tripId!)).toSet();
+          }
+        }
+      }
+    } else {
+      // Genuinely offline (no connectivity at all) — this is the only case
+      // mock data is appropriate, as a degraded fallback so the driver can
+      // still mark attendance locally and sync later.
       final mockRepository = MockDriverRepository();
       _repository = mockRepository;
       try {
@@ -180,10 +210,6 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
       } catch (error) {
         return DriverRouteError(message: error.toString());
       }
-    } else if (_repository is FirestoreDriverRepository) {
-      final metadata = await (_repository as FirestoreDriverRepository).fetchRouteMetadata();
-      _routeId = metadata['routeId'];
-      _busId = metadata['busId'];
     }
 
     final cached = await cacheService.loadAll();
@@ -216,8 +242,11 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
       stops: stops,
       students: syncedStudents,
       routeId: _routeId,
+      busId: _busId,
+      tripId: _tripId,
       routeProgress: progress,
       gpsStatus: _gpsStatusFor(progress: progress),
+      stopsCompleted: _stopsCompleted,
     );
   }
 
@@ -278,6 +307,7 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
               status,
               routeId: _routeId,
               busId: _busId,
+              tripId: _tripId,
             )
             .timeout(const Duration(seconds: 8));
       } catch (_) {
@@ -308,6 +338,8 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
         stops: currentState.stops,
         students: updatedStudents,
         routeId: _routeId,
+        busId: _busId,
+        tripId: _tripId,
         routeProgress: progress,
         gpsStatus: _gpsStatusFor(
           progress: progress,
@@ -317,14 +349,115 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
       ),
     );
   }
+
+  /// Starts a trip for the driver's assigned bus/route: creates (or resumes)
+  /// a `trips` document and begins periodic GPS broadcasting. No-op if a
+  /// trip is already active.
+  Future<void> startTrip() async {
+    final currentState = state.value;
+    if (currentState is! DriverRouteLoaded) return;
+    if (currentState.isTripActive) return;
+    if (_busId == null || _busId!.isEmpty) {
+      state = AsyncError(
+        const DriverRouteError(
+          message: 'No bus assigned yet. Contact your school administrator.',
+        ),
+        StackTrace.current,
+      );
+      return;
+    }
+
+    state = const AsyncLoading<DriverRouteState>();
+    try {
+      _tripId = await _repository.startTrip(busId: _busId!, routeId: _routeId ?? '');
+      _startGpsBroadcast();
+      state = AsyncData(
+        DriverRouteLoaded(
+          stops: currentState.stops,
+          students: currentState.students,
+          routeId: _routeId,
+          busId: _busId,
+          tripId: _tripId,
+          routeProgress: currentState.routeProgress,
+          gpsStatus: 'Trip started',
+        ),
+      );
+    } catch (_) {
+      state = AsyncError(
+        const DriverRouteError(message: 'Unable to start the trip.'),
+        StackTrace.current,
+      );
+    }
+  }
+
+  /// Ends the active trip and stops GPS broadcasting.
+  Future<void> endTrip() async {
+    final currentState = state.value;
+    if (currentState is! DriverRouteLoaded || !currentState.isTripActive) return;
+
+    state = const AsyncLoading<DriverRouteState>();
+    try {
+      await _repository.endTrip(_tripId!);
+      _stopGpsBroadcast();
+      _tripId = null;
+      state = AsyncData(
+        DriverRouteLoaded(
+          stops: currentState.stops,
+          students: currentState.students,
+          routeId: _routeId,
+          busId: _busId,
+          tripId: null,
+          routeProgress: currentState.routeProgress,
+          gpsStatus: 'Trip completed',
+        ),
+      );
+    } catch (_) {
+      state = AsyncError(
+        const DriverRouteError(message: 'Unable to end the trip.'),
+        StackTrace.current,
+      );
+    }
+  }
+
+  void _startGpsBroadcast() {
+    _gpsTimer?.cancel();
+    _gpsTimer = Timer.periodic(const Duration(seconds: 8), (_) => _broadcastCurrentPosition());
+    _broadcastCurrentPosition();
+  }
+
+  void _stopGpsBroadcast() {
+    _gpsTimer?.cancel();
+    _gpsTimer = null;
+  }
+
+  Future<void> _broadcastCurrentPosition() async {
+    if (_busId == null || _busId!.isEmpty) return;
+    try {
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        return;
+      }
+      if (!await Geolocator.isLocationServiceEnabled()) return;
+
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+      );
+      await updateBusLocation(latitude: position.latitude, longitude: position.longitude);
+    } catch (_) {
+      // Silently skip this tick — the next timer fire will retry.
+    }
+  }
+
   Future<void> updateBusLocation({
     required double latitude,
     required double longitude,
   }) async {
     final currentState = state.value;
     if (currentState is! DriverRouteLoaded) return;
-
-    state = const AsyncLoading<DriverRouteState>();
 
     try {
       await _repository.updateBusLocation(
@@ -339,6 +472,8 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
           stops: currentState.stops,
           students: currentState.students,
           routeId: _routeId,
+          busId: _busId,
+          tripId: _tripId,
           routeProgress: currentState.routeProgress,
           gpsStatus: _gpsStatusFor(
             progress: currentState.routeProgress,
