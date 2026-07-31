@@ -46,7 +46,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       if (state is AuthAuthenticated) {
         Navigator.pushNamedAndRemoveUntil(
           context,
-          AppRouter.dashboardForRole(state.user.role),
+          AppRouter.dashboardForUser(state.user),
           (_) => false,
         );
       } else if (state is AuthError) {
