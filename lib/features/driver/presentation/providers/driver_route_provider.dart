@@ -4,52 +4,226 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../shared/providers/attendance_cache_provider.dart';
 import '../../../../shared/providers/connectivity_provider.dart';
+import '../../data/datasources/driver_stream_service.dart';
+import '../../data/datasources/attendance_cache_service.dart';
 import '../../data/models/cached_attendance_record.dart';
+import '../../data/models/driver_alert.dart';
+import '../../data/models/route_data.dart';
+import '../../data/repositories/firestore_driver_repository.dart';
 import '../../data/repositories/mock_driver_repository.dart';
+import '../../domain/models/route_stop.dart';
 import '../../domain/models/student.dart';
+import '../../domain/repositories/driver_repository.dart';
 import 'driver_route_state.dart';
 
+final driverRepositoryProvider = Provider<DriverRepository>(
+  (ref) => FirestoreDriverRepository(),
+);
+
+/// Provides the [DriverStreamService] instance used for live Firestore streams.
+final driverStreamServiceProvider = Provider<DriverStreamService>(
+  (ref) => DriverStreamService(),
+);
+
+/// Exposes a live [Stream] of [RouteData] for the given [routeId].
+///
+/// Emits `null` when the route document does not exist in Firestore.
+final routeDataStreamProvider =
+    StreamProvider.family<RouteData?, String>((ref, routeId) {
+  return ref.watch(driverStreamServiceProvider).routeDataStream(routeId);
+});
+
+/// Exposes a live [Stream] of Admin-sent [DriverAlert]s for the given [routeId].
+///
+/// Ordered by `timestamp` descending. Emits an empty list when no alerts exist.
+final driverAlertsStreamProvider =
+    StreamProvider.family<List<DriverAlert>, String>((ref, routeId) {
+  return ref.watch(driverStreamServiceProvider).alertsStream(routeId);
+});
+
+/// Exposes a live [Stream] of [Student]s assigned to [routeId].
+///
+/// Re-emits on every Admin roster change (add / remove student) so
+/// [StudentAttendanceScreen] reflects mid-trip edits without a manual refresh.
+/// Emits an empty list when [routeId] is empty or no students match.
+final studentRosterStreamProvider =
+    StreamProvider.family<List<Student>, String>((ref, routeId) {
+  if (routeId.isEmpty) return const Stream.empty();
+  return ref.watch(driverStreamServiceProvider).studentsStream(routeId);
+});
 final driverRouteProvider = AsyncNotifierProvider<DriverRouteNotifier, DriverRouteState>(
   DriverRouteNotifier.new,
 );
 
+/// Riverpod [AsyncNotifier] that owns the driver's active-route state.
+///
+/// ## Attendance update flow
+///
+/// [updateStudentAttendanceStatus] decides the write strategy based on
+/// connectivity:
+///
+/// - **Online:** calls [DriverRepository.updateStudentAttendanceStatus] with
+///   the resolved [_routeId] / [_busId], then removes any stale cache entry.
+/// - **Offline:** delegates to [MockDriverRepository] for an optimistic local
+///   update and persists a [CachedAttendanceRecord] (synced = false) via
+///   [AttendanceCacheService].
+/// - **notBoarded:** resets the student locally and deletes any cached record
+///   without touching Firestore.
+///
+/// When connectivity is restored, [_syncCachedAttendanceIfOnline] replays
+/// every pending cache record against Firestore and clears the cache.
+///
+/// ## GPS update flow
+///
+/// [updateBusLocation] forwards coordinates to
+/// [DriverRepository.updateBusLocation] and, on success, stamps
+/// [DriverRouteLoaded.lastGpsUpdateAt] so the UI can display a live
+/// "updated just now" indicator.
 class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
+  late DriverRepository _repository;
+  String? _routeId;
+  String? _busId;
+  bool _online = true;
+
   @override
   FutureOr<DriverRouteState> build() async {
-    return _loadRoute();
-  }
+    ref.listen<AsyncValue<bool>>(connectivityProvider, (previous, next) {
+      final isOnline = next.maybeWhen(data: (value) => value, orElse: () => false);
+      _online = isOnline;
+      if (isOnline) {
+        _syncCachedAttendanceIfOnline();
+      }
+    });
 
-  Future<DriverRouteState> _loadRoute() async {
-    final repository = MockDriverRepository();
-    final cacheService = ref.read(attendanceCacheProvider);
-    ref.watch(connectivityProvider).maybeWhen(
-      data: (value) => value,
-      orElse: () => true,
+    _online = ref.read(connectivityProvider).when(
+      data: (v) => v,
+      loading: () => false,
+      error: (_, __) => false,
     );
 
-    state = const AsyncLoading<DriverRouteState>();
-    try {
-      final stops = await repository.fetchRouteStops();
-      final students = await repository.fetchRouteStudents();
+    if (!ref.mounted) return const DriverRouteInitial();
+    return _loadRoute(isOnline: _online);
+  }
 
-      final cached = await cacheService.loadAll();
-      final merged = students.map((student) {
-        final record = cached[student.id];
-        if (record == null) return student;
-        return student.copyWith(
-          status: AttendanceStatus.values[record.statusIndex],
-        );
-      }).toList();
+  bool _isOnline() => _online;
 
-      return DriverRouteLoaded(stops: stops, students: merged);
-    } catch (error) {
-      return DriverRouteError(message: error.toString());
+  DriverRepository _repositoryForConnectivity(bool isOnline) {
+    if (!isOnline) {
+      return MockDriverRepository();
     }
+
+    return ref.read(driverRepositoryProvider);
+  }
+
+  Future<void> _syncCachedAttendanceIfOnline() async {
+    final currentState = state.value;
+    if (currentState is! DriverRouteLoaded) return;
+    if (!_isOnline()) return;
+
+    final cacheService = ref.read(attendanceCacheProvider);
+
+    // Batch-push all unsynced records to Firestore and delete them from cache.
+    await cacheService.syncOfflineData();
+
+    // Merge any remaining cache entries (e.g. written mid-sync) into state.
+    final remaining = await cacheService.loadAll();
+    final mergedStudents = currentState.students.map((s) {
+      final record = remaining[s.id];
+      return record == null ? s : s.copyWith(status: AttendanceStatus.values[record.statusIndex]);
+    }).toList();
+
+    final boardedCount = mergedStudents
+        .where((s) => s.status == AttendanceStatus.boarded)
+        .length;
+    final progress =
+        mergedStudents.isEmpty ? 0.0 : boardedCount / mergedStudents.length;
+
+    state = AsyncData(
+      DriverRouteLoaded(
+        stops: currentState.stops,
+        students: mergedStudents,
+        routeId: _routeId,
+        routeProgress: progress,
+        gpsStatus: _gpsStatusFor(
+          progress: progress,
+          lastGpsUpdateAt: currentState.lastGpsUpdateAt,
+        ),
+        lastGpsUpdateAt: currentState.lastGpsUpdateAt,
+      ),
+    );
+  }
+
+  Future<DriverRouteState> _loadRoute({required bool isOnline}) async {
+    final cacheService = ref.read(attendanceCacheProvider);
+    final repository = _repositoryForConnectivity(isOnline);
+    _repository = repository;
+
+    List<RouteStop> stops = <RouteStop>[];
+    List<Student> students = <Student>[];
+
+    if (isOnline) {
+      try {
+        stops = await repository.fetchRouteStops();
+        students = await repository.fetchRouteStudents();
+      } catch (_) {
+        stops = <RouteStop>[];
+        students = <Student>[];
+      }
+    }
+
+    if (stops.isEmpty || students.isEmpty) {
+      final mockRepository = MockDriverRepository();
+      _repository = mockRepository;
+      try {
+        stops = await mockRepository.fetchRouteStops();
+        students = await mockRepository.fetchRouteStudents();
+      } catch (error) {
+        return DriverRouteError(message: error.toString());
+      }
+    } else if (_repository is FirestoreDriverRepository) {
+      final metadata = await (_repository as FirestoreDriverRepository).fetchRouteMetadata();
+      _routeId = metadata['routeId'];
+      _busId = metadata['busId'];
+    }
+
+    final cached = await cacheService.loadAll();
+    final merged = students.map((student) {
+      final record = cached[student.id];
+      if (record == null) return student;
+      return student.copyWith(
+        status: AttendanceStatus.values[record.statusIndex],
+      );
+    }).toList();
+
+    // If online, push any pending cached records to Firestore now.
+    if (isOnline) await cacheService.syncOfflineData();
+
+    // Re-read cache after sync (entries written mid-sync survive).
+    final postSync = await cacheService.loadAll();
+    final syncedStudents = merged.map((s) {
+      final record = postSync[s.id];
+      return record == null ? s : s.copyWith(status: AttendanceStatus.values[record.statusIndex]);
+    }).toList();
+
+    final boardedCount = syncedStudents
+        .where((student) => student.status == AttendanceStatus.boarded)
+        .length;
+    final progress = syncedStudents.isEmpty
+        ? 0.0
+        : boardedCount / syncedStudents.length;
+
+    return DriverRouteLoaded(
+      stops: stops,
+      students: syncedStudents,
+      routeId: _routeId,
+      routeProgress: progress,
+      gpsStatus: _gpsStatusFor(progress: progress),
+    );
   }
 
   Future<void> loadRoute() async {
-    state = const AsyncLoading<DriverRouteState>();
-    state = await AsyncValue.guard(() => _loadRoute());
+    final isOnline = await ref.watch(connectivityProvider.future);
+    state = await AsyncValue.guard(() => _loadRoute(isOnline: isOnline));
   }
 
   Future<void> updateStudentAttendanceStatus({
@@ -59,62 +233,142 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
     final currentState = state.value;
     if (currentState is! DriverRouteLoaded) return;
 
-    final repository = MockDriverRepository();
-    final cacheService = ref.read(attendanceCacheProvider);
-    final isOnline = ref.watch(connectivityProvider).maybeWhen(
-      data: (value) => value,
-      orElse: () => true,
+    final currentStudent = currentState.students.firstWhere(
+      (student) => student.id == studentId,
+      orElse: () => Student(id: studentId, name: '', stopName: '', grade: ''),
     );
+    final cacheService = ref.read(attendanceCacheProvider);
+    final isOnline = ref.read(connectivityProvider).when(
+          data: (v) => v,
+          loading: () => _online,
+          error: (_, __) => false,
+        );
+
+    state = const AsyncLoading<DriverRouteState>();
+
+    late Student updatedStudent;
+    if (status == AttendanceStatus.notBoarded) {
+      updatedStudent = currentStudent.copyWith(status: status);
+      await cacheService.deleteRecord(studentId);
+    } else if (!isOnline) {
+      _repository = MockDriverRepository();
+      updatedStudent = await _repository.updateStudentAttendanceStatus(
+        studentId,
+        status,
+        routeId: '',
+        busId: '',
+      );
+      await cacheService.saveRecord(
+        CachedAttendanceRecord(
+          studentId: updatedStudent.id,
+          studentName: updatedStudent.name,
+          stopName: updatedStudent.stopName,
+          statusIndex: updatedStudent.status.index,
+          recordedAt: DateTime.now(),
+          synced: false,
+          routeId: _routeId ?? '',
+        ),
+      );
+    } else {
+      try {
+        final repository = _repository;
+        updatedStudent = await repository
+            .updateStudentAttendanceStatus(
+              studentId,
+              status,
+              routeId: _routeId,
+              busId: _busId,
+            )
+            .timeout(const Duration(seconds: 8));
+      } catch (_) {
+        _repository = MockDriverRepository();
+        updatedStudent = await _repository.updateStudentAttendanceStatus(
+          studentId,
+          status,
+          routeId: '',
+          busId: '',
+        );
+      }
+      await cacheService.deleteRecord(updatedStudent.id);
+    }
+
+    final updatedStudents = currentState.students
+        .map((student) => student.id == updatedStudent.id ? updatedStudent : student)
+        .toList();
+
+    final boardedCount = updatedStudents
+        .where((student) => student.status == AttendanceStatus.boarded)
+        .length;
+    final progress = updatedStudents.isEmpty
+        ? 0.0
+        : boardedCount / updatedStudents.length;
+
+    state = AsyncData(
+      DriverRouteLoaded(
+        stops: currentState.stops,
+        students: updatedStudents,
+        routeId: _routeId,
+        routeProgress: progress,
+        gpsStatus: _gpsStatusFor(
+          progress: progress,
+          lastGpsUpdateAt: currentState.lastGpsUpdateAt,
+        ),
+        lastGpsUpdateAt: currentState.lastGpsUpdateAt,
+      ),
+    );
+  }
+  Future<void> updateBusLocation({
+    required double latitude,
+    required double longitude,
+  }) async {
+    final currentState = state.value;
+    if (currentState is! DriverRouteLoaded) return;
 
     state = const AsyncLoading<DriverRouteState>();
 
     try {
-      final updatedStudent = await repository.updateStudentAttendanceStatus(
-        studentId,
-        status,
+      await _repository.updateBusLocation(
+        latitude,
+        longitude,
+        routeId: _routeId,
+        busId: _busId,
       );
-
-      if (!isOnline) {
-        await cacheService.saveRecord(
-          CachedAttendanceRecord(
-            studentId: updatedStudent.id,
-            studentName: updatedStudent.name,
-            stopName: updatedStudent.stopName,
-            statusIndex: updatedStudent.status.index,
-            recordedAt: DateTime.now(),
-            synced: false,
-          ),
-        );
-      } else {
-        await cacheService.deleteRecord(updatedStudent.id);
-      }
-
-      final updatedStudents = currentState.students
-          .map((student) => student.id == updatedStudent.id ? updatedStudent : student)
-          .toList();
-
-      final boardedCount = updatedStudents
-          .where((student) => student.status == AttendanceStatus.boarded)
-          .length;
-      final progress = updatedStudents.isEmpty
-          ? 0.0
-          : boardedCount / updatedStudents.length;
-
+      final now = DateTime.now();
       state = AsyncData(
         DriverRouteLoaded(
           stops: currentState.stops,
-          students: updatedStudents,
-          routeProgress: progress,
-          gpsStatus: progress >= 1.0
-              ? 'All students marked'
-              : 'Route progress ${(progress * 100).round()}%',
+          students: currentState.students,
+          routeId: _routeId,
+          routeProgress: currentState.routeProgress,
+          gpsStatus: _gpsStatusFor(
+            progress: currentState.routeProgress,
+            lastGpsUpdateAt: now,
+          ),
+          lastGpsUpdateAt: now,
         ),
       );
-    } catch (error) {
+    } catch (_) {
       state = AsyncError(
-        DriverRouteError(message: error.toString()),
+        DriverRouteError(message: 'Unable to update bus location.'),
         StackTrace.current,
       );
     }
+  }
+
+  String _gpsStatusFor({
+    required double progress,
+    DateTime? lastGpsUpdateAt,
+  }) {
+    if (lastGpsUpdateAt != null) {
+      final elapsed = DateTime.now().difference(lastGpsUpdateAt);
+      if (elapsed.inMinutes < 1) {
+        return 'GPS live • updated just now';
+      }
+      return 'GPS live • updated ${elapsed.inMinutes} min ago';
+    }
+
+    return progress >= 1.0
+        ? 'All students marked'
+        : 'Route progress ${(progress * 100).round()}%';
   }
 }

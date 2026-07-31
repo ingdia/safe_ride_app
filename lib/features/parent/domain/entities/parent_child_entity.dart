@@ -28,4 +28,14 @@ class ParentChildEntity {
       pickupStop: pickupStop ?? this.pickupStop,
     );
   }
+
+  ParentChildEntity trimmed() {
+    return ParentChildEntity(
+      id: id,
+      fullName: fullName.trim(),
+      grade: grade.trim(),
+      busNumber: busNumber.trim(),
+      pickupStop: pickupStop.trim(),
+    );
+  }
 }

@@ -35,8 +35,7 @@ class BusesController extends StreamNotifier<List<BusModel>> {
   }
 }
 
-final busesProvider =
-    StreamNotifierProvider<BusesController, List<BusModel>>(
+final busesProvider = StreamNotifierProvider<BusesController, List<BusModel>>(
   BusesController.new,
 );
 
@@ -51,4 +50,3 @@ final busesErrorProvider = Provider<String?>((ref) {
   if (err is FirebaseException) return err.message ?? 'Firestore error';
   return err.toString();
 });
-

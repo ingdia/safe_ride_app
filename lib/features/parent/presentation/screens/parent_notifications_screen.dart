@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/entities/parent_notification_entity.dart';
+import '../providers/parent_data_providers.dart';
+import '../providers/parent_notification_actions_provider.dart';
 import '../providers/parent_notification_center_provider.dart';
 import '../widgets/parent_ui_constants.dart';
 
@@ -10,183 +12,190 @@ class ParentNotificationsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final notificationState = ref.watch(parentNotificationCenterProvider);
-    final controller = ref.read(parentNotificationCenterProvider.notifier);
+    final notificationsState = ref.watch(parentNotificationsStreamProvider);
+    final selectedFilter = ref.watch(parentNotificationFilterProvider);
 
     return Scaffold(
       backgroundColor: ParentUiColors.background,
       body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 720),
-            child: Column(
-              children: [
-                _NotificationsHeader(
-                  totalCount: notificationState.totalCount,
-                  unreadCount: notificationState.unreadCount,
-                  selectedFilter: notificationState.selectedFilter,
-                  onFilterChanged: controller.selectFilter,
-                ),
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(
-                      ParentUiSpacing.lg,
-                      ParentUiSpacing.lg,
-                      ParentUiSpacing.lg,
-                      ParentUiSpacing.xl,
-                    ),
-                    child: Column(
-                      children: [
-                        _MarkAllAsReadButton(
-                          onPressed: () {
-                            controller.markAllAsRead();
+        child: notificationsState.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (error, stackTrace) =>
+              _NotificationErrorState(message: error.toString()),
+          data: (notifications) {
+            final visibleNotifications = _filterNotifications(
+              notifications,
+              selectedFilter,
+            );
 
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'All notifications marked as read',
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                        const SizedBox(height: ParentUiSpacing.lg),
-                        if (notificationState.visibleNotifications.isEmpty)
-                          const _EmptyNotificationCenterCard()
-                        else
-                          ...notificationState.visibleNotifications.map((
-                            notification,
-                          ) {
-                            return Padding(
-                              padding: const EdgeInsets.only(
-                                bottom: ParentUiSpacing.md,
-                              ),
-                              child: _NotificationCard(
-                                notification: notification,
-                                onTap: () {
-                                  _showNotificationDetailsDialog(
-                                    context,
-                                    notification,
-                                    onMarkAsRead: () {
-                                      controller.markAsRead(notification.id);
-                                    },
-                                  );
-                                },
-                                onMarkRead: () {
-                                  controller.markAsRead(notification.id);
-                                },
-                              ),
-                            );
-                          }),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+            return _NotificationsContent(
+              notifications: notifications,
+              visibleNotifications: visibleNotifications,
+              selectedFilter: selectedFilter,
+            );
+          },
         ),
+      ),
+    );
+  }
+
+  List<ParentNotificationEntity> _filterNotifications(
+    List<ParentNotificationEntity> notifications,
+    ParentNotificationFilter filter,
+  ) {
+    switch (filter) {
+      case ParentNotificationFilter.all:
+        return notifications;
+      case ParentNotificationFilter.unread:
+        return notifications
+            .where((notification) => !notification.isRead)
+            .toList();
+    }
+  }
+}
+
+class _NotificationsContent extends ConsumerWidget {
+  const _NotificationsContent({
+    required this.notifications,
+    required this.visibleNotifications,
+    required this.selectedFilter,
+  });
+
+  final List<ParentNotificationEntity> notifications;
+  final List<ParentNotificationEntity> visibleNotifications;
+  final ParentNotificationFilter selectedFilter;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final unreadCount = notifications.where((item) => !item.isRead).length;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.only(bottom: 24),
+      child: Column(
+        children: [
+          _NotificationsHeader(unreadCount: unreadCount),
+          const SizedBox(height: 18),
+          _NotificationFilters(selectedFilter: selectedFilter),
+          const SizedBox(height: 12),
+          _MarkAllReadButton(
+            unreadCount: unreadCount,
+            onPressed: unreadCount == 0
+                ? null
+                : () async {
+                    await ref
+                        .read(parentNotificationActionsProvider)
+                        .markAllAsRead();
+
+                    if (!context.mounted) return;
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('All notifications marked as read.'),
+                      ),
+                    );
+                  },
+          ),
+          const SizedBox(height: 12),
+          if (visibleNotifications.isEmpty)
+            const _EmptyNotificationsCard()
+          else
+            for (final notification in visibleNotifications)
+              _NotificationCard(notification: notification),
+        ],
       ),
     );
   }
 }
 
 class _NotificationsHeader extends StatelessWidget {
-  const _NotificationsHeader({
-    required this.totalCount,
-    required this.unreadCount,
-    required this.selectedFilter,
-    required this.onFilterChanged,
-  });
+  const _NotificationsHeader({required this.unreadCount});
 
-  final int totalCount;
   final int unreadCount;
-  final ParentNotificationFilter selectedFilter;
-  final ValueChanged<ParentNotificationFilter> onFilterChanged;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(
-        ParentUiSpacing.lg,
-        ParentUiSpacing.xl,
-        ParentUiSpacing.lg,
-        ParentUiSpacing.lg,
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
+      decoration: const BoxDecoration(
+        color: ParentUiColors.orange,
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(28)),
       ),
-      color: ParentUiColors.orange,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Row(
-            children: [
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Notifications',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 29,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    SizedBox(height: 8),
-                    Text(
-                      'Stay updated with alerts',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: ParentUiSpacing.lg,
-                  vertical: ParentUiSpacing.md,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.20),
-                  borderRadius: BorderRadius.circular(100),
-                ),
-                child: Text(
-                  '$unreadCount new',
-                  style: const TextStyle(
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Notifications',
+                  style: TextStyle(
                     color: Colors.white,
-                    fontSize: 18,
+                    fontSize: 26,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
-              ),
-            ],
+                SizedBox(height: 6),
+                Text(
+                  'Stay updated with bus alerts',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: ParentUiSpacing.xl),
-          Row(
-            children: [
-              Expanded(
-                child: _FilterChipButton(
-                  label: 'All ($totalCount)',
-                  isSelected: selectedFilter == ParentNotificationFilter.all,
-                  onTap: () {
-                    onFilterChanged(ParentNotificationFilter.all);
-                  },
-                ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.18),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Text(
+              '$unreadCount new',
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
               ),
-              const SizedBox(width: ParentUiSpacing.sm),
-              Expanded(
-                child: _FilterChipButton(
-                  label: 'Unread ($unreadCount)',
-                  isSelected: selectedFilter == ParentNotificationFilter.unread,
-                  onTap: () {
-                    onFilterChanged(ParentNotificationFilter.unread);
-                  },
-                ),
-              ),
-            ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NotificationFilters extends ConsumerWidget {
+  const _NotificationFilters({required this.selectedFilter});
+
+  final ParentNotificationFilter selectedFilter;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        children: [
+          _FilterChipButton(
+            label: 'All',
+            isSelected: selectedFilter == ParentNotificationFilter.all,
+            onTap: () {
+              ref
+                  .read(parentNotificationFilterProvider.notifier)
+                  .selectFilter(ParentNotificationFilter.all);
+            },
+          ),
+          const SizedBox(width: 10),
+          _FilterChipButton(
+            label: 'Unread',
+            isSelected: selectedFilter == ParentNotificationFilter.unread,
+            onTap: () {
+              ref
+                  .read(parentNotificationFilterProvider.notifier)
+                  .selectFilter(ParentNotificationFilter.unread);
+            },
           ),
         ],
       ),
@@ -207,171 +216,170 @@ class _FilterChipButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.22),
-      borderRadius: BorderRadius.circular(22),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(22),
-        child: SizedBox(
-          height: 56,
-          child: Center(
-            child: Text(
-              label,
-              style: TextStyle(
-                color: isSelected ? ParentUiColors.darkOrange : Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ),
-        ),
+    return ChoiceChip(
+      label: Text(label),
+      selected: isSelected,
+      selectedColor: ParentUiColors.orange.withValues(alpha: 0.16),
+      labelStyle: TextStyle(
+        color: isSelected ? ParentUiColors.orange : Colors.grey.shade700,
+        fontWeight: FontWeight.w800,
       ),
+      onSelected: (_) => onTap(),
     );
   }
 }
 
-class _MarkAllAsReadButton extends StatelessWidget {
-  const _MarkAllAsReadButton({required this.onPressed});
-
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 64,
-      width: double.infinity,
-      child: OutlinedButton(
-        onPressed: onPressed,
-        style: OutlinedButton.styleFrom(
-          side: const BorderSide(color: ParentUiColors.orange, width: 2),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(22),
-          ),
-          foregroundColor: ParentUiColors.darkOrange,
-          textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
-        ),
-        child: const Text('Mark All as Read'),
-      ),
-    );
-  }
-}
-
-class _NotificationCard extends StatelessWidget {
-  const _NotificationCard({
-    required this.notification,
-    required this.onTap,
-    required this.onMarkRead,
+class _MarkAllReadButton extends StatelessWidget {
+  const _MarkAllReadButton({
+    required this.unreadCount,
+    required this.onPressed,
   });
 
-  final ParentNotificationEntity notification;
-  final VoidCallback onTap;
-  final VoidCallback onMarkRead;
+  final int unreadCount;
+  final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
-    final style = _notificationStyle(notification.type);
-    final isUnread = !notification.isRead;
-
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(22),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(22),
-        child: Ink(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(
-              color: isUnread ? ParentUiColors.orange : ParentUiColors.border,
-              width: isUnread ? 2 : 1,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.08),
-                blurRadius: 10,
-                offset: const Offset(0, 5),
-              ),
-            ],
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: OutlinedButton.icon(
+        onPressed: onPressed,
+        icon: const Icon(Icons.done_all),
+        label: Text(
+          unreadCount == 0 ? 'All notifications read' : 'Mark All as Read',
+        ),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: ParentUiColors.orange,
+          side: const BorderSide(color: ParentUiColors.orange),
+          minimumSize: const Size(double.infinity, 48),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NotificationCard extends ConsumerWidget {
+  const _NotificationCard({required this.notification});
+
+  final ParentNotificationEntity notification;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final style = _notificationStyle(notification.type);
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: notification.isRead
+              ? Colors.transparent
+              : ParentUiColors.orange.withValues(alpha: 0.35),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(22),
+          onTap: () {
+            _showNotificationDetailsDialog(context, ref, notification);
+          },
           child: Padding(
-            padding: const EdgeInsets.all(ParentUiSpacing.lg),
-            child: Stack(
+            padding: const EdgeInsets.all(15),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      height: 50,
-                      width: 50,
-                      decoration: BoxDecoration(
-                        color: style.backgroundColor,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(style.icon, color: style.iconColor, size: 28),
-                    ),
-                    const SizedBox(width: ParentUiSpacing.md),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                Container(
+                  height: 46,
+                  width: 46,
+                  decoration: BoxDecoration(
+                    color: style.background,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Icon(style.icon, color: style.foreground),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
                         children: [
-                          Text(
-                            notification.title,
-                            style: ParentUiTextStyles.heading.copyWith(
-                              fontSize: 22,
+                          Expanded(
+                            child: Text(
+                              notification.title,
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w900,
+                              ),
                             ),
                           ),
-                          const SizedBox(height: ParentUiSpacing.xs),
-                          Text(
-                            notification.message,
-                            style: ParentUiTextStyles.body.copyWith(
-                              color: const Color(0xFF334155),
-                              height: 1.35,
+                          if (!notification.isRead)
+                            Container(
+                              height: 9,
+                              width: 9,
+                              decoration: const BoxDecoration(
+                                color: ParentUiColors.orange,
+                                shape: BoxShape.circle,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: ParentUiSpacing.sm),
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.access_time_rounded,
-                                color: ParentUiColors.textSecondary,
-                                size: 18,
-                              ),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                child: Text(
-                                  notification.time,
-                                  style: ParentUiTextStyles.caption.copyWith(
-                                    color: ParentUiColors.textSecondary,
-                                  ),
-                                ),
-                              ),
-                              if (isUnread)
-                                TextButton(
-                                  onPressed: onMarkRead,
-                                  style: TextButton.styleFrom(
-                                    foregroundColor: ParentUiColors.darkOrange,
-                                    visualDensity: VisualDensity.compact,
-                                  ),
-                                  child: const Text('Mark read'),
-                                ),
-                            ],
-                          ),
                         ],
                       ),
-                    ),
-                  ],
-                ),
-                if (isUnread)
-                  const Positioned(
-                    right: 2,
-                    top: 2,
-                    child: CircleAvatar(
-                      radius: 6,
-                      backgroundColor: ParentUiColors.orange,
-                    ),
+                      const SizedBox(height: 6),
+                      Text(
+                        notification.message,
+                        style: TextStyle(
+                          color: Colors.grey.shade700,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Text(
+                            notification.time,
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const Spacer(),
+                          if (!notification.isRead)
+                            TextButton(
+                              onPressed: () async {
+                                await ref
+                                    .read(parentNotificationActionsProvider)
+                                    .markAsRead(notification.id);
+
+                                if (!context.mounted) return;
+
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Notification marked as read.',
+                                    ),
+                                  ),
+                                );
+                              },
+                              child: const Text('Mark read'),
+                            ),
+                        ],
+                      ),
+                    ],
                   ),
+                ),
               ],
             ),
           ),
@@ -381,35 +389,29 @@ class _NotificationCard extends StatelessWidget {
   }
 }
 
-class _EmptyNotificationCenterCard extends StatelessWidget {
-  const _EmptyNotificationCenterCard();
+class _EmptyNotificationsCard extends StatelessWidget {
+  const _EmptyNotificationsCard();
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(ParentUiSpacing.lg),
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: ParentUiColors.border),
       ),
-      child: Column(
+      child: const Column(
         children: [
-          const Icon(
-            Icons.notifications_none_rounded,
+          Icon(
+            Icons.notifications_none,
             color: ParentUiColors.orange,
             size: 42,
           ),
-          const SizedBox(height: ParentUiSpacing.md),
-          Text('No notifications here', style: ParentUiTextStyles.heading),
-          const SizedBox(height: ParentUiSpacing.xs),
+          SizedBox(height: 10),
           Text(
-            'Your selected notification filter has no alerts.',
-            textAlign: TextAlign.center,
-            style: ParentUiTextStyles.caption.copyWith(
-              color: ParentUiColors.textSecondary,
-            ),
+            'No notifications to show.',
+            style: TextStyle(fontWeight: FontWeight.w800),
           ),
         ],
       ),
@@ -417,138 +419,104 @@ class _EmptyNotificationCenterCard extends StatelessWidget {
   }
 }
 
-void _showNotificationDetailsDialog(
-  BuildContext context,
-  ParentNotificationEntity notification, {
-  required VoidCallback onMarkAsRead,
-}) {
-  final style = _notificationStyle(notification.type);
+class _NotificationErrorState extends StatelessWidget {
+  const _NotificationErrorState({required this.message});
 
-  showDialog<void>(
-    context: context,
-    builder: (dialogContext) {
-      return AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-        title: Row(
-          children: [
-            Container(
-              height: 46,
-              width: 46,
-              decoration: BoxDecoration(
-                color: style.backgroundColor,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(style.icon, color: style.iconColor),
-            ),
-            const SizedBox(width: ParentUiSpacing.sm),
-            Expanded(
-              child: Text(
-                notification.title,
-                style: ParentUiTextStyles.heading.copyWith(fontSize: 21),
-              ),
-            ),
-          ],
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Text(
+          'Unable to load notifications.\n$message',
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontWeight: FontWeight.w700),
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              notification.message,
-              style: ParentUiTextStyles.body.copyWith(height: 1.4),
-            ),
-            const SizedBox(height: ParentUiSpacing.md),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(ParentUiSpacing.md),
-              decoration: BoxDecoration(
-                color: ParentUiColors.lightOrange,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.access_time_rounded,
-                    color: ParentUiColors.darkOrange,
-                    size: 20,
-                  ),
-                  const SizedBox(width: ParentUiSpacing.xs),
-                  Expanded(
-                    child: Text(
-                      notification.time,
-                      style: ParentUiTextStyles.body.copyWith(
-                        color: ParentUiColors.darkOrange,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(dialogContext).pop();
-            },
-            child: const Text('Close'),
-          ),
-          if (!notification.isRead)
-            ElevatedButton(
-              onPressed: () {
-                onMarkAsRead();
-                Navigator.of(dialogContext).pop();
-
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Notification marked as read')),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: ParentUiColors.orange,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Mark as read'),
-            ),
-        ],
-      );
-    },
-  );
-}
-
-_NotificationStyle _notificationStyle(ParentAlertType type) {
-  switch (type) {
-    case ParentAlertType.boarded:
-    case ParentAlertType.dropped:
-      return const _NotificationStyle(
-        icon: Icons.check_circle_outline_rounded,
-        iconColor: Color(0xFF16A34A),
-        backgroundColor: Color(0xFFDCFCE7),
-      );
-    case ParentAlertType.delay:
-    case ParentAlertType.emergency:
-      return const _NotificationStyle(
-        icon: Icons.error_outline_rounded,
-        iconColor: ParentUiColors.orange,
-        backgroundColor: ParentUiColors.lightOrange,
-      );
-    case ParentAlertType.general:
-      return const _NotificationStyle(
-        icon: Icons.info_outline_rounded,
-        iconColor: Color(0xFF2563EB),
-        backgroundColor: Color(0xFFDBEAFE),
-      );
+      ),
+    );
   }
 }
 
 class _NotificationStyle {
   const _NotificationStyle({
     required this.icon,
-    required this.iconColor,
-    required this.backgroundColor,
+    required this.background,
+    required this.foreground,
   });
 
   final IconData icon;
-  final Color iconColor;
-  final Color backgroundColor;
+  final Color background;
+  final Color foreground;
+}
+
+_NotificationStyle _notificationStyle(ParentAlertType type) {
+  switch (type) {
+    case ParentAlertType.boarded:
+      return _NotificationStyle(
+        icon: Icons.directions_bus_filled,
+        background: Colors.green.withValues(alpha: 0.12),
+        foreground: Colors.green,
+      );
+    case ParentAlertType.dropped:
+      return _NotificationStyle(
+        icon: Icons.check_circle,
+        background: Colors.blue.withValues(alpha: 0.12),
+        foreground: Colors.blue,
+      );
+    case ParentAlertType.delay:
+      return _NotificationStyle(
+        icon: Icons.warning_amber,
+        background: Colors.orange.withValues(alpha: 0.14),
+        foreground: Colors.orange,
+      );
+    case ParentAlertType.emergency:
+      return _NotificationStyle(
+        icon: Icons.emergency,
+        background: Colors.red.withValues(alpha: 0.12),
+        foreground: Colors.red,
+      );
+    case ParentAlertType.general:
+      return _NotificationStyle(
+        icon: Icons.notifications,
+        background: ParentUiColors.orange.withValues(alpha: 0.12),
+        foreground: ParentUiColors.orange,
+      );
+  }
+}
+
+void _showNotificationDetailsDialog(
+  BuildContext context,
+  WidgetRef ref,
+  ParentNotificationEntity notification,
+) {
+  showDialog<void>(
+    context: context,
+    builder: (dialogContext) {
+      return AlertDialog(
+        title: Text(notification.title),
+        content: Text(notification.message),
+        actions: [
+          if (!notification.isRead)
+            TextButton(
+              onPressed: () async {
+                await ref
+                    .read(parentNotificationActionsProvider)
+                    .markAsRead(notification.id);
+
+                if (!dialogContext.mounted) return;
+
+                Navigator.pop(dialogContext);
+              },
+              child: const Text('Mark read'),
+            ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Close'),
+          ),
+        ],
+      );
+    },
+  );
 }

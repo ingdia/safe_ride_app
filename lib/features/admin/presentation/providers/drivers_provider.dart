@@ -1,5 +1,4 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 import '../../data/models/user_model.dart';
 import 'users_provider.dart';
 
@@ -41,4 +40,3 @@ class DriversNotifier extends Notifier<void> {
 final driversNotifierProvider = NotifierProvider<DriversNotifier, void>(
   DriversNotifier.new,
 );
-
