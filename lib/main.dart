@@ -1,12 +1,14 @@
-import 'dart:async';
-
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'core/firebase/firebase_options.dart';
+import 'firebase_options.dart';
 import 'core/routing/app_router.dart';
+import 'core/routing/auth_routes.dart';
+import 'core/services/notification_service.dart';
 import 'core/storage/hive_boxes.dart';
+import 'features/auth/domain/entities/auth_user.dart';
+import 'features/auth/presentation/providers/auth_provider.dart';
 import 'features/parent/presentation/widgets/parent_ui_constants.dart';
 
 Future<void> main() async {
@@ -17,6 +19,7 @@ Future<void> main() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+    await NotificationService.instance.initialize();
   } catch (error) {
     debugPrint('Firebase initialization failed: $error');
   }
@@ -65,20 +68,20 @@ class SafeRideApp extends StatelessWidget {
 // Splash screen
 // ---------------------------------------------------------------------------
 
-class SplashScreen extends StatefulWidget {
+class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
 
   @override
-  State<SplashScreen> createState() => _SplashScreenState();
+  ConsumerState<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen>
+class _SplashScreenState extends ConsumerState<SplashScreen>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late final Animation<double> _fade;
   late final Animation<double> _scale;
   bool _disposed = false;
-  Timer? _navigationTimer;
+  bool _hasNavigated = false;
 
   @override
   void initState() {
@@ -93,25 +96,44 @@ class _SplashScreenState extends State<SplashScreen>
     );
 
     _controller.forward();
-
-    _navigationTimer = Timer(const Duration(milliseconds: 2400), _navigate);
-  }
-
-  void _navigate() {
-    if (_disposed || !mounted) return;
-    Navigator.pushReplacementNamed(context, '/auth/login');
   }
 
   @override
   void dispose() {
     _disposed = true;
-    _navigationTimer?.cancel();
     _controller.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<AsyncValue<AuthUser?>>(authUserProvider, (previous, next) {
+      if (_disposed || !mounted || _hasNavigated) return;
+
+      next.when(
+        data: (user) {
+          if (_disposed || !mounted || _hasNavigated) return;
+          _hasNavigated = true;
+
+          if (user != null) {
+            Navigator.pushReplacementNamed(
+              context,
+              AppRouter.dashboardForUser(user),
+            );
+            return;
+          }
+
+          Navigator.pushReplacementNamed(context, AuthRoutes.login);
+        },
+        loading: () {},
+        error: (_, _) {
+          if (_disposed || !mounted || _hasNavigated) return;
+          _hasNavigated = true;
+          Navigator.pushReplacementNamed(context, AuthRoutes.login);
+        },
+      );
+    });
+
     return Scaffold(
       backgroundColor: ParentUiColors.orange,
       body: Center(
