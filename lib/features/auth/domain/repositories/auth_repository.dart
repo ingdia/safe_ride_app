@@ -5,6 +5,13 @@ abstract class AuthRepository {
   /// Throws [AuthException] on failure.
   Future<AuthUser> login({required String email, required String password});
 
+  /// Returns the authenticated [AuthUser] after Google Sign-In.
+  /// Throws [AuthException] on failure.
+  Future<AuthUser> loginWithGoogle();
+
+  /// Returns the currently signed-in [AuthUser] if available.
+  Future<AuthUser?> currentUser();
+
   /// Returns the newly created [AuthUser] on success.
   /// Throws [AuthException] on failure.
   Future<AuthUser> register({
@@ -16,4 +23,7 @@ abstract class AuthRepository {
   /// Sends a password reset link to [email].
   /// Throws [AuthException] on failure.
   Future<void> forgotPassword({required String email});
+
+  /// Signs out the current user.
+  Future<void> signOut();
 }
