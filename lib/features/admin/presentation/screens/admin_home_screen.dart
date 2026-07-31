@@ -2,19 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/bus_model.dart';
 import '../providers/buses_provider.dart';
-import '../providers/drivers_provider.dart';
 import '../providers/fleet_overview_provider.dart';
-import '../providers/notifications_provider.dart';
 import '../providers/schools_provider.dart';
+import '../widgets/admin_notification_bell.dart';
 import '../widgets/admin_ui_constants.dart';
 import '../widgets/gradient_header.dart';
 import '../widgets/stat_card.dart';
 import '../widgets/fleet_bus_card.dart';
-import '../widgets/notification_tile.dart';
 import '../widgets/bus_form_sheet.dart';
-import 'manage_routes_screen.dart';
-import 'pending_drivers_screen.dart';
-import 'reports_analytics_screen.dart';
 
 class FleetOverviewScreen extends ConsumerWidget {
   const FleetOverviewScreen({super.key});
@@ -92,8 +87,6 @@ class FleetOverviewScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final summaries = ref.watch(fleetSummaryProvider);
     final stats = ref.watch(fleetStatsProvider);
-    final notifications = ref.watch(notificationsProvider).take(3).toList();
-    final pendingDriverCount = ref.watch(pendingDriversCountProvider);
 
     return Scaffold(
       backgroundColor: AdminUiColors.scaffoldBackground,
@@ -106,9 +99,17 @@ class FleetOverviewScreen extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const HeaderTitleBlock(
-                      title: 'Fleet Overview',
-                      subtitle: 'Real-time monitoring and management',
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Expanded(
+                          child: HeaderTitleBlock(
+                            title: 'Buses',
+                            subtitle: 'Real-time monitoring and management',
+                          ),
+                        ),
+                        const AdminNotificationBell(),
+                      ],
                     ),
                     const SizedBox(height: AdminUiSpacing.lg),
                     StatRow(
@@ -171,79 +172,6 @@ class FleetOverviewScreen extends ConsumerWidget {
                       ),
                     ),
                   ),
-                ),
-              ),
-            ),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(
-                AdminUiSpacing.md,
-                AdminUiSpacing.lg,
-                AdminUiSpacing.md,
-                0,
-              ),
-              sliver: const SliverToBoxAdapter(
-                child: _SectionHeader(title: 'Recent Alerts'),
-              ),
-            ),
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AdminUiSpacing.md,
-              ),
-              sliver: SliverList.separated(
-                itemCount: notifications.length,
-                separatorBuilder: (_, _) =>
-                    const SizedBox(height: AdminUiSpacing.sm),
-                itemBuilder: (context, index) =>
-                    AlertPreviewTile(notification: notifications[index]),
-              ),
-            ),
-            SliverPadding(
-              padding: const EdgeInsets.all(AdminUiSpacing.md),
-              sliver: SliverToBoxAdapter(
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => const ManageRoutesScreen(),
-                            ),
-                          );
-                        },
-                        icon: const Icon(Icons.settings_outlined, size: 18),
-                        label: const Text('Routes'),
-                      ),
-                    ),
-                    const SizedBox(width: AdminUiSpacing.sm),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => const PendingDriversScreen(),
-                            ),
-                          );
-                        },
-                        icon: const Icon(Icons.badge_outlined, size: 18),
-                        label: Text('Drivers ($pendingDriverCount)'),
-                      ),
-                    ),
-                    const SizedBox(width: AdminUiSpacing.sm),
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => const ReportsAnalyticsScreen(),
-                            ),
-                          );
-                        },
-                        icon: const Icon(Icons.bar_chart_rounded, size: 18),
-                        label: const Text('Reports'),
-                      ),
-                    ),
-                  ],
                 ),
               ),
             ),

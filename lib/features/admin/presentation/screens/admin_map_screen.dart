@@ -1,61 +1,34 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:latlong2/latlong.dart' as latlong;
+
+import '../../../../core/firebase/firebase_collections.dart';
+import '../../../../shared/models/bus_location_entity.dart';
+import '../providers/buses_provider.dart';
 import '../widgets/admin_ui_constants.dart';
 import '../widgets/gradient_header.dart';
 
-enum StopProgress { completed, current, upcoming }
+final _schoolBusLocationsProvider = StreamProvider.autoDispose.family<
+    List<BusLocationEntity>, List<String>>((ref, busIds) {
+  if (busIds.isEmpty) return Stream.value(const []);
+  return FirebaseFirestore.instance
+      .collection(FirebaseCollections.busLocations)
+      .where(FieldPath.documentId, whereIn: busIds.length > 10 ? busIds.sublist(0, 10) : busIds)
+      .snapshots()
+      .map((snap) => snap.docs.map(BusLocationEntity.fromDoc).toList());
+});
 
-class RouteStopDisplay {
-  final int order;
-  final String name;
-  final int studentCount;
-  final StopProgress progress;
-
-  const RouteStopDisplay({
-    required this.order,
-    required this.name,
-    required this.studentCount,
-    required this.progress,
-  });
-}
-
-const List<RouteStopDisplay> _liveStops = [
-  RouteStopDisplay(
-    order: 1,
-    name: 'Oak Street',
-    studentCount: 3,
-    progress: StopProgress.completed,
-  ),
-  RouteStopDisplay(
-    order: 2,
-    name: 'Maple Avenue',
-    studentCount: 2,
-    progress: StopProgress.current,
-  ),
-  RouteStopDisplay(
-    order: 3,
-    name: 'Pine Road',
-    studentCount: 4,
-    progress: StopProgress.upcoming,
-  ),
-  RouteStopDisplay(
-    order: 4,
-    name: 'Elm Court',
-    studentCount: 2,
-    progress: StopProgress.upcoming,
-  ),
-  RouteStopDisplay(
-    order: 5,
-    name: 'Cedar Lane',
-    studentCount: 5,
-    progress: StopProgress.upcoming,
-  ),
-];
-
-class LiveMapScreen extends StatelessWidget {
+class LiveMapScreen extends ConsumerWidget {
   const LiveMapScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final buses = ref.watch(busesProvider);
+    final busIds = buses.map((b) => b.busId).toList();
+    final locationsAsync = ref.watch(_schoolBusLocationsProvider(busIds));
+
     return Scaffold(
       backgroundColor: AdminUiColors.scaffoldBackground,
       body: SafeArea(
@@ -67,65 +40,21 @@ class LiveMapScreen extends StatelessWidget {
                 child: HeaderTitleBlock(
                   title: 'Live Map',
                   subtitle: 'Real-time bus tracking',
+                  onBack: () => Navigator.of(context).pop(),
                 ),
               ),
             ),
             SliverPadding(
               padding: const EdgeInsets.all(AdminUiSpacing.md),
               sliver: SliverToBoxAdapter(
-                child: Container(
-                  height: 200,
-                  decoration: BoxDecoration(
-                    color: AdminUiColors.statCardBackground,
-                    borderRadius: BorderRadius.circular(AdminUiRadii.card),
-                  ),
-                  child: Center(
-                    child: Container(
-                      padding: const EdgeInsets.all(AdminUiSpacing.lg),
-                      decoration: BoxDecoration(
-                        color: AdminUiColors.cardBackground,
-                        borderRadius: BorderRadius.circular(AdminUiRadii.card),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.06),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 48,
-                            height: 48,
-                            decoration: const BoxDecoration(
-                              color: AdminUiColors.primaryOrange,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.navigation_rounded,
-                              color: Colors.white,
-                            ),
-                          ),
-                          const SizedBox(height: AdminUiSpacing.sm),
-                          const Text(
-                            'Interactive Map View',
-                            style: TextStyle(
-                              color: AdminUiColors.primaryOrange,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          const Text(
-                            'GPS tracking visualization',
-                            style: TextStyle(
-                              color: AdminUiColors.textSecondary,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(AdminUiRadii.card),
+                  child: SizedBox(
+                    height: 320,
+                    child: locationsAsync.when(
+                      loading: () => const Center(child: CircularProgressIndicator()),
+                      error: (e, st) => Center(child: Text('Unable to load bus locations.\n$e')),
+                      data: (locations) => _MapView(locations: locations),
                     ),
                   ),
                 ),
@@ -138,36 +67,34 @@ class LiveMapScreen extends StatelessWidget {
                 AdminUiSpacing.md,
                 0,
               ),
-              sliver: SliverToBoxAdapter(
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Route Stops',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    Text(
-                      '${_liveStops.length} stops',
-                      style: const TextStyle(
-                        color: AdminUiColors.textSecondary,
-                        fontSize: 12.5,
-                      ),
-                    ),
-                  ],
-                ),
+              sliver: const SliverToBoxAdapter(
+                child: Text('Buses', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
               ),
             ),
             SliverPadding(
               padding: const EdgeInsets.all(AdminUiSpacing.md),
-              sliver: SliverList.separated(
-                itemCount: _liveStops.length,
-                separatorBuilder: (_, _) =>
-                    const SizedBox(height: AdminUiSpacing.sm),
-                itemBuilder: (context, index) =>
-                    _StopRow(stop: _liveStops[index]),
+              sliver: locationsAsync.maybeWhen(
+                data: (locations) => buses.isEmpty
+                    ? const SliverToBoxAdapter(
+                        child: Padding(
+                          padding: EdgeInsets.all(24),
+                          child: Center(child: Text('No buses added yet.')),
+                        ),
+                      )
+                    : SliverList.separated(
+                        itemCount: buses.length,
+                        separatorBuilder: (_, _) => const SizedBox(height: AdminUiSpacing.sm),
+                        itemBuilder: (context, index) {
+                          final bus = buses[index];
+                          final loc = locations.where((l) => l.busId == bus.busId).toList();
+                          return _BusLocationRow(
+                            plateNumber: bus.plateNumber,
+                            hasLocation: loc.isNotEmpty,
+                            updatedAt: loc.isNotEmpty ? loc.first.updatedAt : null,
+                          );
+                        },
+                      ),
+                orElse: () => const SliverToBoxAdapter(child: SizedBox.shrink()),
               ),
             ),
           ],
@@ -177,127 +104,93 @@ class LiveMapScreen extends StatelessWidget {
   }
 }
 
-class _StopRow extends StatelessWidget {
-  final RouteStopDisplay stop;
+class _MapView extends StatelessWidget {
+  const _MapView({required this.locations});
 
-  const _StopRow({required this.stop});
+  final List<BusLocationEntity> locations;
 
   @override
   Widget build(BuildContext context) {
-    final isCurrent = stop.progress == StopProgress.current;
+    if (locations.isEmpty) {
+      return Container(
+        color: AdminUiColors.statCardBackground,
+        alignment: Alignment.center,
+        child: const Text(
+          'No buses are broadcasting a live location right now.',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: AdminUiColors.textSecondary, fontWeight: FontWeight.w600),
+        ),
+      );
+    }
 
+    final center = latlong.LatLng(locations.first.lat, locations.first.lng);
+
+    return FlutterMap(
+      options: MapOptions(initialCenter: center, initialZoom: 12),
+      children: [
+        TileLayer(
+          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+          userAgentPackageName: 'com.saferide.app',
+        ),
+        MarkerLayer(
+          markers: [
+            for (final loc in locations)
+              Marker(
+                point: latlong.LatLng(loc.lat, loc.lng),
+                width: 40,
+                height: 40,
+                child: const Icon(
+                  Icons.directions_bus_filled,
+                  color: AdminUiColors.primaryOrange,
+                  size: 32,
+                ),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _BusLocationRow extends StatelessWidget {
+  const _BusLocationRow({
+    required this.plateNumber,
+    required this.hasLocation,
+    required this.updatedAt,
+  });
+
+  final String plateNumber;
+  final bool hasLocation;
+  final DateTime? updatedAt;
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(AdminUiSpacing.md),
       decoration: BoxDecoration(
         color: AdminUiColors.cardBackground,
         borderRadius: BorderRadius.circular(AdminUiRadii.card),
-        border: Border.all(
-          color: isCurrent
-              ? AdminUiColors.primaryOrange
-              : AdminUiColors.borderSubtle,
-          width: isCurrent ? 1.5 : 1,
-        ),
+        border: Border.all(color: AdminUiColors.borderSubtle),
       ),
       child: Row(
         children: [
-          Container(
-            width: 28,
-            height: 28,
-            decoration: BoxDecoration(
-              color: isCurrent
-                  ? AdminUiColors.primaryOrange
-                  : AdminUiColors.statCardBackground,
-              shape: BoxShape.circle,
-            ),
-            child: Center(
-              child: Text(
-                '${stop.order}',
-                style: TextStyle(
-                  color: isCurrent ? Colors.white : AdminUiColors.primaryOrange,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13,
-                ),
-              ),
-            ),
+          Icon(
+            Icons.directions_bus_filled_rounded,
+            color: hasLocation ? AdminUiColors.primaryOrange : AdminUiColors.textSecondary,
           ),
           const SizedBox(width: AdminUiSpacing.md),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  stop.name,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.location_on_outlined,
-                      size: 13,
-                      color: AdminUiColors.textSecondary,
-                    ),
-                    const SizedBox(width: 2),
-                    Text(
-                      '${stop.studentCount} students',
-                      style: const TextStyle(
-                        color: AdminUiColors.textSecondary,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+            child: Text('Bus $plateNumber', style: const TextStyle(fontWeight: FontWeight.w600)),
+          ),
+          Text(
+            hasLocation ? 'Live' : 'No signal',
+            style: TextStyle(
+              color: hasLocation ? AdminUiColors.onTimeFg : AdminUiColors.textSecondary,
+              fontWeight: FontWeight.w700,
+              fontSize: 12.5,
             ),
           ),
-          _ProgressChip(progress: stop.progress),
         ],
-      ),
-    );
-  }
-}
-
-class _ProgressChip extends StatelessWidget {
-  final StopProgress progress;
-
-  const _ProgressChip({required this.progress});
-
-  @override
-  Widget build(BuildContext context) {
-    late final Color bg;
-    late final Color fg;
-    late final String label;
-
-    switch (progress) {
-      case StopProgress.completed:
-        bg = AdminUiColors.onTimeBg;
-        fg = AdminUiColors.onTimeFg;
-        label = 'Completed';
-        break;
-      case StopProgress.current:
-        bg = AdminUiColors.statCardBackground;
-        fg = AdminUiColors.primaryOrange;
-        label = 'Current';
-        break;
-      case StopProgress.upcoming:
-        bg = AdminUiColors.divider;
-        fg = AdminUiColors.textSecondary;
-        label = 'Upcoming';
-        break;
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(AdminUiRadii.chip),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(color: fg, fontSize: 11, fontWeight: FontWeight.w600),
       ),
     );
   }
