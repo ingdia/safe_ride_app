@@ -90,6 +90,11 @@ class TodaysRouteScreen extends ConsumerWidget {
                       (context, index) => _RouteStopTile(
                         stop: stops[index],
                         onTap: () => _showStopDetails(context, stops[index]),
+                        isCompleted: loadedState.stopsCompleted.contains(stops[index].name),
+                        canMarkPassed: loadedState.isTripActive,
+                        onMarkPassed: () => ref
+                            .read(driverRouteProvider.notifier)
+                            .markStopCompleted(stops[index].name),
                       ),
                       childCount: stops.length,
                     ),
@@ -499,19 +504,30 @@ class _SummaryStat extends StatelessWidget {
 /// `widgets/route_stop_tile.dart` if it ends up reused elsewhere
 /// (e.g. on the Driver Map screen).
 class _RouteStopTile extends StatelessWidget {
-  const _RouteStopTile({required this.stop, required this.onTap});
+  const _RouteStopTile({
+    required this.stop,
+    required this.onTap,
+    required this.isCompleted,
+    required this.canMarkPassed,
+    required this.onMarkPassed,
+  });
 
   final RouteStop stop;
   final VoidCallback onTap;
+  final bool isCompleted;
+  final bool canMarkPassed;
+  final VoidCallback onMarkPassed;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.only(bottom: AppSpacing.sm),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: isCompleted ? AppColors.success.withValues(alpha: 0.06) : AppColors.surface,
         borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(
+          color: isCompleted ? AppColors.success.withValues(alpha: 0.4) : AppColors.border,
+        ),
       ),
       clipBehavior: Clip.antiAlias,
       child: Material(
@@ -529,20 +545,24 @@ class _RouteStopTile extends StatelessWidget {
                   height: AppSpacing.tapTargetMin,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: stop.isDestination
-                        ? AppColors.success.withValues(alpha: 0.15)
-                        : AppColors.primary.withValues(alpha: 0.12),
+                    color: isCompleted
+                        ? AppColors.success.withValues(alpha: 0.18)
+                        : stop.isDestination
+                            ? AppColors.success.withValues(alpha: 0.15)
+                            : AppColors.primary.withValues(alpha: 0.12),
                     shape: BoxShape.circle,
                   ),
-                  child: Text(
-                    '${stop.order}',
-                    style: AppTextStyles.bodyMedium.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: stop.isDestination
-                          ? AppColors.success
-                          : AppColors.primary,
-                    ),
-                  ),
+                  child: isCompleted
+                      ? const Icon(Icons.check_rounded, color: AppColors.success)
+                      : Text(
+                          '${stop.order}',
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: stop.isDestination
+                                ? AppColors.success
+                                : AppColors.primary,
+                          ),
+                        ),
                 ),
                 const SizedBox(width: AppSpacing.sm),
                 Expanded(
@@ -552,35 +572,55 @@ class _RouteStopTile extends StatelessWidget {
                       Text(stop.name, style: AppTextStyles.bodyMedium),
                       if (!stop.isDestination)
                         Text(
-                          '${stop.studentCount} student'
-                          '${stop.studentCount == 1 ? '' : 's'}',
+                          isCompleted
+                              ? 'Passed'
+                              : '${stop.studentCount} student'
+                                  '${stop.studentCount == 1 ? '' : 's'}',
                           style: AppTextStyles.bodySmall.copyWith(
-                            color: AppColors.textSecondary,
+                            color: isCompleted ? AppColors.success : AppColors.textSecondary,
+                            fontWeight: isCompleted ? FontWeight.w700 : null,
                           ),
                         )
                       else
                         Text(
-                          'Final destination',
+                          isCompleted ? 'Arrived' : 'Final destination',
                           style: AppTextStyles.bodySmall.copyWith(
-                            color: AppColors.textSecondary,
+                            color: isCompleted ? AppColors.success : AppColors.textSecondary,
+                            fontWeight: isCompleted ? FontWeight.w700 : null,
                           ),
                         ),
                     ],
                   ),
                 ),
-                Text(
-                  stop.time,
-                  style: AppTextStyles.bodySmall.copyWith(
-                    color: AppColors.textSecondary,
-                    fontWeight: FontWeight.w600,
+                if (canMarkPassed && !isCompleted)
+                  SizedBox(
+                    height: 34,
+                    child: OutlinedButton(
+                      onPressed: onMarkPassed,
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        foregroundColor: AppColors.primary,
+                        side: const BorderSide(color: AppColors.primary),
+                        textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                      ),
+                      child: const Text('Mark passed'),
+                    ),
+                  )
+                else ...[
+                  Text(
+                    stop.time,
+                    style: AppTextStyles.bodySmall.copyWith(
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-                const SizedBox(width: AppSpacing.xs),
-                Icon(
-                  Icons.chevron_right_rounded,
-                  color: AppColors.textSecondary,
-                  size: 20,
-                ),
+                  const SizedBox(width: AppSpacing.xs),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: AppColors.textSecondary,
+                    size: 20,
+                  ),
+                ],
               ],
             ),
           ),

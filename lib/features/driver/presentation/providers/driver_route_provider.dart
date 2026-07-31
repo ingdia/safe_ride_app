@@ -346,8 +346,41 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
           lastGpsUpdateAt: currentState.lastGpsUpdateAt,
         ),
         lastGpsUpdateAt: currentState.lastGpsUpdateAt,
+        stopsCompleted: _stopsCompleted,
       ),
     );
+  }
+
+  /// Marks [stopName] as passed on the active trip — writes to Firestore
+  /// (which is what the admin activity feed and parent tracking screen
+  /// read) and updates local state immediately.
+  Future<void> markStopCompleted(String stopName) async {
+    final currentState = state.value;
+    if (currentState is! DriverRouteLoaded || !currentState.isTripActive) return;
+    if (_stopsCompleted.contains(stopName)) return;
+
+    _stopsCompleted = {..._stopsCompleted, stopName};
+    state = AsyncData(
+      DriverRouteLoaded(
+        stops: currentState.stops,
+        students: currentState.students,
+        routeId: _routeId,
+        busId: _busId,
+        tripId: _tripId,
+        routeProgress: currentState.routeProgress,
+        gpsStatus: currentState.gpsStatus,
+        lastGpsUpdateAt: currentState.lastGpsUpdateAt,
+        stopsCompleted: _stopsCompleted,
+      ),
+    );
+
+    try {
+      await _repository.markStopCompleted(tripId: _tripId!, stopName: stopName);
+    } catch (_) {
+      // Best-effort — if this fails the stop just won't show as passed for
+      // anyone else; the driver can tap it again.
+      _stopsCompleted = {..._stopsCompleted}..remove(stopName);
+    }
   }
 
   /// Starts a trip for the driver's assigned bus/route: creates (or resumes)
@@ -370,6 +403,7 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
     state = const AsyncLoading<DriverRouteState>();
     try {
       _tripId = await _repository.startTrip(busId: _busId!, routeId: _routeId ?? '');
+      _stopsCompleted = {}; // fresh trip — no stops passed yet
       _startGpsBroadcast();
       state = AsyncData(
         DriverRouteLoaded(
@@ -380,6 +414,7 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
           tripId: _tripId,
           routeProgress: currentState.routeProgress,
           gpsStatus: 'Trip started',
+          stopsCompleted: _stopsCompleted,
         ),
       );
     } catch (_) {
@@ -409,6 +444,7 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
           tripId: null,
           routeProgress: currentState.routeProgress,
           gpsStatus: 'Trip completed',
+          stopsCompleted: _stopsCompleted,
         ),
       );
     } catch (_) {
@@ -480,6 +516,7 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
             lastGpsUpdateAt: now,
           ),
           lastGpsUpdateAt: now,
+          stopsCompleted: _stopsCompleted,
         ),
       );
     } catch (_) {
