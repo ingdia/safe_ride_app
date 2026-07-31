@@ -69,14 +69,16 @@ Map<String, dynamic> _studentDoc({
   String name = 'Alice',
   String stopName = 'Oak Street',
   String grade = 'P3',
-  String status = 'notBoarded',
+  String attendanceStatus = 'notBoarded',
   String routeId = 'route_001',
 }) =>
     {
       'name': name,
       'stopName': stopName,
       'grade': grade,
-      'status': status,
+      // Distinct from `status`, which holds the school-approval state
+      // (pending/approved/rejected) — attendance marks must never touch it.
+      'attendanceStatus': attendanceStatus,
       DriverFirestoreFields.routeId: routeId,
     };
 
@@ -438,10 +440,10 @@ void main() {
 
     test('attendance status strings map to correct AttendanceStatus values', () async {
       final col = fakeFirestore.collection('students');
-      await col.doc('stu_boarded').set(_studentDoc(status: 'boarded', routeId: routeId, stopName: 'A'));
-      await col.doc('stu_alighted').set(_studentDoc(status: 'alighted', routeId: routeId, stopName: 'B'));
-      await col.doc('stu_absent').set(_studentDoc(status: 'absent', routeId: routeId, stopName: 'C'));
-      await col.doc('stu_default').set(_studentDoc(status: 'notBoarded', routeId: routeId, stopName: 'D'));
+      await col.doc('stu_boarded').set(_studentDoc(attendanceStatus: 'boarded', routeId: routeId, stopName: 'A'));
+      await col.doc('stu_alighted').set(_studentDoc(attendanceStatus: 'alighted', routeId: routeId, stopName: 'B'));
+      await col.doc('stu_absent').set(_studentDoc(attendanceStatus: 'absent', routeId: routeId, stopName: 'C'));
+      await col.doc('stu_default').set(_studentDoc(attendanceStatus: 'notBoarded', routeId: routeId, stopName: 'D'));
 
       final students = await service.studentsStream(routeId).first;
       final byId = {for (final s in students) s.id: s};
@@ -454,7 +456,7 @@ void main() {
 
     test('re-emits updated list when a student document changes', () async {
       final ref = fakeFirestore.collection('students').doc('stu_001');
-      await ref.set(_studentDoc(status: 'notBoarded', routeId: routeId));
+      await ref.set(_studentDoc(attendanceStatus: 'notBoarded', routeId: routeId));
 
       expect(
         service.studentsStream(routeId),
@@ -466,7 +468,7 @@ void main() {
         ]),
       );
 
-      await ref.update({'status': 'boarded'});
+      await ref.update({'attendanceStatus': 'boarded'});
     });
 
     test('stopName falls back to routeStop field when stopName is absent', () async {
@@ -474,7 +476,7 @@ void main() {
         'name': 'Alice',
         'routeStop': 'Kigali Heights',
         'grade': 'P4',
-        'status': 'notBoarded',
+        'attendanceStatus': 'notBoarded',
         DriverFirestoreFields.routeId: routeId,
       });
 
