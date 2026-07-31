@@ -1,10 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 enum AdminTab {
-  dashboard,
-  emergency,
-  map,
-  alerts,
+  buses,
+  drivers,
+  students,
+  routes,
   profile,
 }
 
@@ -16,7 +16,7 @@ final adminNavigationProvider =
 class AdminNavigationController extends Notifier<AdminTab> {
   @override
   AdminTab build() {
-    return AdminTab.dashboard;
+    return AdminTab.buses;
   }
 
   void selectTab(AdminTab tab) {
@@ -27,13 +27,13 @@ class AdminNavigationController extends Notifier<AdminTab> {
 extension AdminTabExtension on AdminTab {
   int get index {
     switch (this) {
-      case AdminTab.dashboard:
+      case AdminTab.buses:
         return 0;
-      case AdminTab.emergency:
+      case AdminTab.drivers:
         return 1;
-      case AdminTab.map:
+      case AdminTab.students:
         return 2;
-      case AdminTab.alerts:
+      case AdminTab.routes:
         return 3;
       case AdminTab.profile:
         return 4;
@@ -42,14 +42,14 @@ extension AdminTabExtension on AdminTab {
 
   String get label {
     switch (this) {
-      case AdminTab.dashboard:
-        return 'Dashboard';
-      case AdminTab.emergency:
-        return 'Emergency';
-      case AdminTab.map:
-        return 'Map';
-      case AdminTab.alerts:
-        return 'Alerts';
+      case AdminTab.buses:
+        return 'Buses';
+      case AdminTab.drivers:
+        return 'Drivers';
+      case AdminTab.students:
+        return 'Students';
+      case AdminTab.routes:
+        return 'Routes';
       case AdminTab.profile:
         return 'Profile';
     }
@@ -59,15 +59,15 @@ extension AdminTabExtension on AdminTab {
 AdminTab adminTabFromIndex(int index) {
   switch (index) {
     case 1:
-      return AdminTab.emergency;
+      return AdminTab.drivers;
     case 2:
-      return AdminTab.map;
+      return AdminTab.students;
     case 3:
-      return AdminTab.alerts;
+      return AdminTab.routes;
     case 4:
       return AdminTab.profile;
     case 0:
     default:
-      return AdminTab.dashboard;
+      return AdminTab.buses;
   }
 }
