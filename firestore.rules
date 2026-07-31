@@ -1,0 +1,185 @@
+rules_version = '2';
+
+// SafeRide Firestore Security Rules
+//
+// Enforces the spec's access model on the Firebase Spark (free) plan:
+//   - Parents see only their own children's data.
+//   - Drivers see only students/trips tied to their own assigned bus.
+//   - Admins manage only their own school's data.
+//
+// There is no backend/Cloud Functions on Spark, so a user's role and
+// schoolId cannot live in a server-issued auth custom claim (that requires
+// the Admin SDK). Instead every rule below reads the caller's own
+// `users/{uid}` document via `get()` to learn their role/schoolId/busId.
+// That costs one extra document read per rule evaluation, which is the
+// accepted tradeoff for staying off Blaze billing.
+//
+// Deploy with: firebase deploy --only firestore:rules
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function myUser() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function myRole() {
+      return isSignedIn() ? myUser().role : null;
+    }
+
+    function mySchoolId() {
+      return isSignedIn() ? myUser().schoolId : null;
+    }
+
+    function myBusId() {
+      return isSignedIn() ? myUser().busId : null;
+    }
+
+    // Cross-school management (creating schools, provisioning each school's
+    // first admin) has no role of its own in the spec, and there's no
+    // backend to issue a custom claim for one on the Spark plan. So it's
+    // decided purely by matching the caller's own verified email — same
+    // approach as SuperAdminConfig on the client.
+    function isSuperAdmin() {
+      return isSignedIn() && request.auth.token.email == 'ngabirediane02@gmail.com';
+    }
+
+    function isAdmin() {
+      return isSignedIn() && myRole() == 'admin';
+    }
+
+    function isDriver() {
+      return isSignedIn() && myRole() == 'driver';
+    }
+
+    function isParent() {
+      return isSignedIn() && myRole() == 'parent';
+    }
+
+    function unchangedExcept(fields) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields);
+    }
+
+    // ---------------------------------------------------------------------
+    // schools — directory info, not sensitive. Every signed-in user can
+    // read it (parents need the list during onboarding, before their own
+    // schoolId is set). Only the owning admin can write.
+    // ---------------------------------------------------------------------
+    match /schools/{schoolId} {
+      allow read: if isSignedIn();
+      allow create: if isSuperAdmin();
+      allow update, delete: if isSuperAdmin() || (isAdmin() && schoolId == mySchoolId());
+    }
+
+    // ---------------------------------------------------------------------
+    // users — everyone can read/update their own doc. An admin can also
+    // read/update accounts within their own school (needed for the driver
+    // roster + assigning buses). No one can delete a user doc from the
+    // client.
+    // ---------------------------------------------------------------------
+    match /users/{userId} {
+      allow read: if isSignedIn() && (
+        request.auth.uid == userId ||
+        isSuperAdmin() ||
+        (isAdmin() && resource.data.schoolId == mySchoolId())
+      );
+      // Self-registration (parent/driver/admin's own doc), the super admin
+      // provisioning a new school admin, or a school admin provisioning a
+      // new driver for their own school — both via the secondary-app flow,
+      // so the write happens as the *creator*, not as the new account.
+      allow create: if isSignedIn() && (
+        request.auth.uid == userId ||
+        isSuperAdmin() ||
+        (isAdmin()
+          && request.resource.data.role == 'driver'
+          && request.resource.data.schoolId == mySchoolId())
+      );
+      allow update: if isSignedIn() && (
+        request.auth.uid == userId ||
+        isSuperAdmin() ||
+        (isAdmin() && resource.data.schoolId == mySchoolId())
+      );
+      allow delete: if false;
+    }
+
+    // ---------------------------------------------------------------------
+    // students — the core of the parent/admin/driver split.
+    // ---------------------------------------------------------------------
+    match /students/{studentId} {
+      allow read: if isSignedIn() && (
+        resource.data.parentId == request.auth.uid ||
+        (isAdmin() && resource.data.schoolId == mySchoolId()) ||
+        (isDriver() && resource.data.busId == myBusId())
+      );
+
+      // Onboarding: a parent may only create their own pending student.
+      allow create: if isParent()
+        && request.resource.data.parentId == request.auth.uid
+        && request.resource.data.status == 'pending';
+
+      // Admin approval/assignment — any field, own school only.
+      allow update: if isAdmin() && resource.data.schoolId == mySchoolId();
+
+      // Driver may only flip the attendance field for a student on their bus.
+      allow update: if isDriver()
+        && resource.data.busId == myBusId()
+        && unchangedExcept(['attendanceStatus']);
+
+      // Parent may edit their own child's name/grade, nothing assignment-related.
+      allow update: if resource.data.parentId == request.auth.uid
+        && unchangedExcept(['name', 'grade', 'photoUrl']);
+
+      allow delete: if resource.data.parentId == request.auth.uid || isAdmin();
+    }
+
+    // ---------------------------------------------------------------------
+    // routes / buses — admin-managed, school-scoped read for everyone else.
+    // ---------------------------------------------------------------------
+    match /routes/{routeId} {
+      allow read: if isSignedIn() && resource.data.schoolId == mySchoolId();
+      allow create: if isAdmin() && request.resource.data.schoolId == mySchoolId();
+      allow update, delete: if isAdmin() && resource.data.schoolId == mySchoolId();
+    }
+
+    match /buses/{busId} {
+      allow read: if isSignedIn() && resource.data.schoolId == mySchoolId();
+      allow create: if isAdmin() && request.resource.data.schoolId == mySchoolId();
+      allow update, delete: if isAdmin() && resource.data.schoolId == mySchoolId();
+    }
+
+    // ---------------------------------------------------------------------
+    // trips — created/updated only by the assigned driver; read by anyone
+    // in the same school (admin dashboards, the assigned driver, and
+    // parents whose child is on that bus).
+    // ---------------------------------------------------------------------
+    match /trips/{tripId} {
+      allow read: if isSignedIn() && resource.data.schoolId == mySchoolId();
+      allow create: if isDriver() && request.resource.data.driverId == request.auth.uid;
+      allow update: if isDriver() && resource.data.driverId == request.auth.uid;
+      allow delete: if false;
+    }
+
+    // ---------------------------------------------------------------------
+    // busLocations — GPS ticks. Written only by the driver of that bus;
+    // read by anyone in the same school as that bus.
+    // ---------------------------------------------------------------------
+    match /busLocations/{busId} {
+      allow read: if isSignedIn()
+        && get(/databases/$(database)/documents/buses/$(busId)).data.schoolId == mySchoolId();
+      allow write: if isDriver() && busId == myBusId();
+    }
+
+    // ---------------------------------------------------------------------
+    // notifications — each record belongs to one parent; nothing here is
+    // ever deleted from the client.
+    // ---------------------------------------------------------------------
+    match /notifications/{notificationId} {
+      allow read, update: if isSignedIn() && resource.data.parentId == request.auth.uid;
+      allow create: if isSignedIn();
+      allow delete: if false;
+    }
+  }
+}
