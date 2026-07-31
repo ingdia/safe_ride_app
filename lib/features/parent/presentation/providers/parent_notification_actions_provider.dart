@@ -18,9 +18,7 @@ class ParentNotificationActions {
 
     await repository.markNotificationAsRead(notificationId);
 
-    _ref
-      ..invalidate(parentNotificationsProvider)
-      ..invalidate(parentNotificationsStreamProvider);
+    _ref.invalidate(parentNotificationsStreamProvider);
   }
 
   Future<void> markAllAsRead() async {
@@ -28,8 +26,6 @@ class ParentNotificationActions {
 
     await repository.markAllNotificationsAsRead();
 
-    _ref
-      ..invalidate(parentNotificationsProvider)
-      ..invalidate(parentNotificationsStreamProvider);
+    _ref.invalidate(parentNotificationsStreamProvider);
   }
 }

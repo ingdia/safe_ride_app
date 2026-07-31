@@ -12,23 +12,23 @@ class ParentChildrenActions {
 
   final Ref _ref;
 
+  /// Adds another child under the parent's existing school. The new student
+  /// is created with status `pending`, matching first-time onboarding — an
+  /// admin must approve and assign it before bus/route/stop info appears.
   Future<void> addChild({
     required String fullName,
     required String grade,
-    required String busNumber,
-    required String pickupStop,
+    required String schoolId,
+    required String requestedStop,
   }) async {
     final repository = _ref.read(parentRepositoryProvider);
 
-    final child = ParentChildEntity(
-      id: '',
-      fullName: fullName,
-      grade: grade,
-      busNumber: busNumber,
-      pickupStop: pickupStop,
-    ).trimmed();
-
-    await repository.addChild(child);
+    await repository.addChild(
+      fullName: fullName.trim(),
+      grade: grade.trim(),
+      schoolId: schoolId,
+      requestedStop: requestedStop.trim(),
+    );
 
     _ref.invalidate(parentChildrenStreamProvider);
   }
@@ -36,7 +36,7 @@ class ParentChildrenActions {
   Future<void> updateChild(ParentChildEntity child) async {
     final repository = _ref.read(parentRepositoryProvider);
 
-    await repository.updateChild(child.trimmed());
+    await repository.updateChild(child);
 
     _ref.invalidate(parentChildrenStreamProvider);
   }
