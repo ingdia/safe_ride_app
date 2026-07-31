@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../shared/widgets/app_navigation_shell.dart';
 import '../providers/parent_navigation_provider.dart';
+import '../providers/parent_notification_trigger_provider.dart';
 import 'parent_home_screen.dart';
 import 'parent_notifications_screen.dart';
 import 'parent_profile_screen.dart';
@@ -43,6 +44,10 @@ class ParentNavigationShell extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Keeps the local-notification diffing subscriptions alive for the
+    // parent's whole session.
+    ref.watch(parentNotificationTriggerProvider);
+
     final selectedIndex = ref.watch(parentNavigationProvider).index;
 
     return AppNavigationShell(

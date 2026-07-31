@@ -19,76 +19,62 @@ class ParentHomeScreen extends ConsumerWidget {
       backgroundColor: ParentUiColors.background,
       body: SafeArea(
         child: tripState.when(
-          loading: () {
-            return _HomeContent(
-              trip: _fallbackTrip('Loading live data...'),
-              notificationsState: notificationsState,
-            );
-          },
-          error: (error, stackTrace) {
-            return _HomeContent(
-              trip: _fallbackTrip('Using offline fallback'),
-              notificationsState: notificationsState,
-            );
-          },
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (error, stackTrace) => _ErrorState(message: error.toString()),
           data: (trip) {
-            return _HomeContent(
-              trip: trip,
-              notificationsState: notificationsState,
-            );
+            if (trip == null) {
+              return const _NoApprovedChildState();
+            }
+            return _HomeContent(trip: trip, notificationsState: notificationsState);
           },
         ),
       ),
     );
   }
+}
 
-  ParentTripEntity _fallbackTrip(String label) {
-    return ParentTripEntity(
-      tripId: 'trip_001',
-      childName: 'Ineza Uwase',
-      schoolName: 'Kigali Parents School',
-      grade: 'Primary 4',
-      busNumber: 'Bus #12',
-      driverName: 'Jean Bosco',
-      currentStop: 'Remera',
-      nextStop: 'Giporoso',
-      eta: '8:15 AM',
-      stopsAway: 4,
-      progress: 0.42,
-      status: ParentTripStatus.onTime,
-      busLatitude: -1.9565,
-      busLongitude: 30.1044,
-      lastUpdatedLabel: label,
-      routeStops: const [
-        ParentRouteStopEntity(
-          id: 'stop_001',
-          name: 'Kacyiru',
-          time: '3 students',
-          status: ParentRouteStopStatus.completed,
-          position: 1,
+class _NoApprovedChildState extends StatelessWidget {
+  const _NoApprovedChildState();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.hourglass_top_rounded, size: 48, color: ParentUiColors.orange),
+            const SizedBox(height: 16),
+            const Text(
+              'No approved child yet',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Once the school approves a child, live tracking will appear here.',
+              style: TextStyle(color: Colors.grey.shade600),
+              textAlign: TextAlign.center,
+            ),
+          ],
         ),
-        ParentRouteStopEntity(
-          id: 'stop_002',
-          name: 'Gishushu',
-          time: '2 students',
-          status: ParentRouteStopStatus.completed,
-          position: 2,
-        ),
-        ParentRouteStopEntity(
-          id: 'stop_003',
-          name: 'Remera',
-          time: '4 students',
-          status: ParentRouteStopStatus.current,
-          position: 3,
-        ),
-        ParentRouteStopEntity(
-          id: 'stop_004',
-          name: 'Giporoso',
-          time: '2 students',
-          status: ParentRouteStopStatus.upcoming,
-          position: 4,
-        ),
-      ],
+      ),
+    );
+  }
+}
+
+class _ErrorState extends StatelessWidget {
+  const _ErrorState({required this.message});
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Text('Unable to load trip data.\n$message', textAlign: TextAlign.center),
+      ),
     );
   }
 }
@@ -159,6 +145,15 @@ class _HomeHeader extends StatelessWidget {
                     color: Colors.white.withValues(alpha: 0.92),
                     fontSize: 15,
                     fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  trip.legLabel,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.85),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -254,8 +249,8 @@ class _ActionButtons extends StatelessWidget {
           content: Text(
             'Current stop: ${trip.currentStop}\n'
             'Next stop: ${trip.nextStop}\n'
-            'Latitude: ${trip.busLatitude.toStringAsFixed(4)}\n'
-            'Longitude: ${trip.busLongitude.toStringAsFixed(4)}\n'
+            '${trip.busLatitude != null ? 'Latitude: ${trip.busLatitude!.toStringAsFixed(4)}\n' : ''}'
+            '${trip.busLongitude != null ? 'Longitude: ${trip.busLongitude!.toStringAsFixed(4)}\n' : ''}'
             '${trip.lastUpdatedLabel}',
           ),
           actions: [

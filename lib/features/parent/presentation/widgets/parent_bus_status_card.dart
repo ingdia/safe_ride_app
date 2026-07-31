@@ -152,20 +152,15 @@ class _StatusBadge extends StatelessWidget {
           background: Colors.green.withValues(alpha: 0.12),
           foreground: Colors.green,
         );
-      case ParentTripStatus.delayed:
+      case ParentTripStatus.notStarted:
         return _StatusBadgeColors(
-          background: Colors.orange.withValues(alpha: 0.14),
-          foreground: Colors.orange,
+          background: Colors.grey.withValues(alpha: 0.16),
+          foreground: Colors.grey.shade700,
         );
       case ParentTripStatus.completed:
         return _StatusBadgeColors(
           background: Colors.blue.withValues(alpha: 0.12),
           foreground: Colors.blue,
-        );
-      case ParentTripStatus.emergency:
-        return _StatusBadgeColors(
-          background: Colors.red.withValues(alpha: 0.12),
-          foreground: Colors.red,
         );
     }
   }
