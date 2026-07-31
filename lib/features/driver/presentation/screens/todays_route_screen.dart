@@ -56,6 +56,19 @@ class TodaysRouteScreen extends ConsumerWidget {
             final stops = loadedState.stops;
             final progress = (loadedState.routeProgress * 100).round();
 
+            if (stops.isEmpty) {
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  child: Text(
+                    'No route assigned yet. Contact your school administrator.',
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSecondary),
+                  ),
+                ),
+              );
+            }
+
             return CustomScrollView(
               slivers: [
                 SliverToBoxAdapter(child: _buildHeader(context)),
@@ -100,7 +113,7 @@ class TodaysRouteScreen extends ConsumerWidget {
           ),
         ),
       ),
-      floatingActionButton: _buildStartRouteButton(context),
+      floatingActionButton: _buildStartRouteButton(context, ref),
       floatingActionButtonLocation:
           FloatingActionButtonLocation.centerFloat,
     );
@@ -278,7 +291,11 @@ class TodaysRouteScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildStartRouteButton(BuildContext context) {
+  Widget _buildStartRouteButton(BuildContext context, WidgetRef ref) {
+    final routeState = ref.watch(driverRouteProvider).value;
+    final isTripActive = routeState is DriverRouteLoaded && routeState.isTripActive;
+    final hasRoute = routeState is DriverRouteLoaded && routeState.stops.isNotEmpty;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
       child: Column(
@@ -288,17 +305,30 @@ class TodaysRouteScreen extends ConsumerWidget {
             width: double.infinity,
             height: AppSpacing.tapTargetMin + 8, // >= 48dp Material tap target
             child: ElevatedButton.icon(
-              onPressed: () {
-                // TODO(Task 2): Check GPS status via DriverRouteBloc,
-                // then navigate to the Active Route screen (Fig. 5 flow).
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Starting route…')),
-                );
-              },
-              icon: const Icon(Icons.navigation_rounded),
-              label: const Text('Start Route'),
+              onPressed: !hasRoute
+                  ? null
+                  : () async {
+                      final notifier = ref.read(driverRouteProvider.notifier);
+                      if (isTripActive) {
+                        await notifier.endTrip();
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Trip ended.')),
+                          );
+                        }
+                      } else {
+                        await notifier.startTrip();
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Trip started — sharing live location.')),
+                          );
+                        }
+                      }
+                    },
+              icon: Icon(isTripActive ? Icons.flag_rounded : Icons.navigation_rounded),
+              label: Text(isTripActive ? 'End Trip' : 'Start Route'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
+                backgroundColor: isTripActive ? AppColors.warning : AppColors.primary,
                 foregroundColor: Colors.white,
                 textStyle: AppTextStyles.buttonLabel,
                 shape: RoundedRectangleBorder(
