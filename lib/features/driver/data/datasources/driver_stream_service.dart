@@ -152,7 +152,10 @@ class DriverStreamService {
 
   Student _studentFromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data() ?? {};
-    final statusStr = (data['status'] as String?) ?? 'notBoarded';
+    // `attendanceStatus`, not `status` — `status` is the school-approval
+    // state (pending/approved/rejected) and must not be conflated with
+    // boarding/drop-off state.
+    final statusStr = (data['attendanceStatus'] as String?) ?? 'notBoarded';
     return Student(
       id: doc.id,
       name: (data['name'] as String?) ?? '',
