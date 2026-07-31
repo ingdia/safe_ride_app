@@ -1,41 +1,45 @@
+enum ParentChildStatus { pending, approved, rejected }
+
 class ParentChildEntity {
   const ParentChildEntity({
     required this.id,
     required this.fullName,
     required this.grade,
-    required this.busNumber,
-    required this.pickupStop,
+    required this.status,
+    this.schoolId,
+    this.busId,
+    this.busNumber,
+    this.pickupStop,
+    this.driverName,
+    this.driverPhone,
   });
 
   final String id;
   final String fullName;
   final String grade;
-  final String busNumber;
-  final String pickupStop;
+  final ParentChildStatus status;
+  final String? schoolId;
+  final String? busId;
+  final String? busNumber;
+  final String? pickupStop;
+  final String? driverName;
+  final String? driverPhone;
 
-  ParentChildEntity copyWith({
-    String? id,
-    String? fullName,
-    String? grade,
-    String? busNumber,
-    String? pickupStop,
-  }) {
-    return ParentChildEntity(
-      id: id ?? this.id,
-      fullName: fullName ?? this.fullName,
-      grade: grade ?? this.grade,
-      busNumber: busNumber ?? this.busNumber,
-      pickupStop: pickupStop ?? this.pickupStop,
-    );
-  }
+  bool get isApproved => status == ParentChildStatus.approved;
+  bool get isAssignedToBus => busId != null && busId!.isNotEmpty;
 
-  ParentChildEntity trimmed() {
+  ParentChildEntity copyWith({String? fullName, String? grade}) {
     return ParentChildEntity(
       id: id,
-      fullName: fullName.trim(),
-      grade: grade.trim(),
-      busNumber: busNumber.trim(),
-      pickupStop: pickupStop.trim(),
+      fullName: fullName ?? this.fullName,
+      grade: grade ?? this.grade,
+      status: status,
+      schoolId: schoolId,
+      busId: busId,
+      busNumber: busNumber,
+      pickupStop: pickupStop,
+      driverName: driverName,
+      driverPhone: driverPhone,
     );
   }
 }

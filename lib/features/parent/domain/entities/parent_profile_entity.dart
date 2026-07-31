@@ -6,6 +6,7 @@ class ParentProfileEntity {
     required this.email,
     required this.homeAddress,
     required this.preferredLanguage,
+    this.schoolId,
   });
 
   final String parentId;
@@ -14,6 +15,7 @@ class ParentProfileEntity {
   final String email;
   final String homeAddress;
   final String preferredLanguage;
+  final String? schoolId;
 
   ParentProfileEntity copyWith({
     String? parentId,
@@ -30,6 +32,7 @@ class ParentProfileEntity {
       email: email ?? this.email,
       homeAddress: homeAddress ?? this.homeAddress,
       preferredLanguage: preferredLanguage ?? this.preferredLanguage,
+      schoolId: schoolId,
     );
   }
 
@@ -41,6 +44,7 @@ class ParentProfileEntity {
       email: email.trim(),
       homeAddress: homeAddress.trim(),
       preferredLanguage: preferredLanguage.trim(),
+      schoolId: schoolId,
     );
   }
 }
