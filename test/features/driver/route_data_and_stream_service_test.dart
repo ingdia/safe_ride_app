@@ -70,7 +70,7 @@ Map<String, dynamic> _studentDoc({
   String stopName = 'Oak Street',
   String grade = 'P3',
   String attendanceStatus = 'notBoarded',
-  String routeId = 'route_001',
+  String busId = 'bus_001',
 }) =>
     {
       'name': name,
@@ -79,7 +79,7 @@ Map<String, dynamic> _studentDoc({
       // Distinct from `status`, which holds the school-approval state
       // (pending/approved/rejected) — attendance marks must never touch it.
       'attendanceStatus': attendanceStatus,
-      DriverFirestoreFields.routeId: routeId,
+      DriverFirestoreFields.busId: busId,
     };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -400,38 +400,42 @@ void main() {
   group('DriverStreamService.studentsStream', () {
     late FakeFirebaseFirestore fakeFirestore;
     late DriverStreamService service;
-    const routeId = 'route_001';
+    // studentsStream filters students by `busId`, not `routeId` — the
+    // `students` security rule only grants a driver access via
+    // `resource.data.busId == myBusId()`, so the query has to match that
+    // field. See DriverStreamService.studentsStream.
+    const busId = 'bus_001';
 
     setUp(() {
       fakeFirestore = FakeFirebaseFirestore();
       service = DriverStreamService(firestore: fakeFirestore);
     });
 
-    test('emits empty list when no students match routeId', () async {
-      // Seed a student on a different route — should not appear.
+    test('emits empty list when no students match busId', () async {
+      // Seed a student on a different bus — should not appear.
       await fakeFirestore
           .collection('students')
           .doc('stu_other')
-          .set(_studentDoc(routeId: 'route_999'));
+          .set(_studentDoc(busId: 'bus_999'));
 
       expect(
-        service.studentsStream(routeId),
+        service.studentsStream(busId),
         emits(isEmpty),
       );
     });
 
-    test('emits parsed Student list filtered by routeId', () async {
+    test('emits parsed Student list filtered by busId', () async {
       await fakeFirestore
           .collection('students')
           .doc('stu_001')
-          .set(_studentDoc(name: 'Alice', routeId: routeId));
-      // Different route — must be excluded.
+          .set(_studentDoc(name: 'Alice', busId: busId));
+      // Different bus — must be excluded.
       await fakeFirestore
           .collection('students')
           .doc('stu_other')
-          .set(_studentDoc(name: 'Bob', routeId: 'route_999'));
+          .set(_studentDoc(name: 'Bob', busId: 'bus_999'));
 
-      final students = await service.studentsStream(routeId).first;
+      final students = await service.studentsStream(busId).first;
 
       expect(students, hasLength(1));
       expect(students.first.id, 'stu_001');
@@ -440,12 +444,12 @@ void main() {
 
     test('attendance status strings map to correct AttendanceStatus values', () async {
       final col = fakeFirestore.collection('students');
-      await col.doc('stu_boarded').set(_studentDoc(attendanceStatus: 'boarded', routeId: routeId, stopName: 'A'));
-      await col.doc('stu_alighted').set(_studentDoc(attendanceStatus: 'alighted', routeId: routeId, stopName: 'B'));
-      await col.doc('stu_absent').set(_studentDoc(attendanceStatus: 'absent', routeId: routeId, stopName: 'C'));
-      await col.doc('stu_default').set(_studentDoc(attendanceStatus: 'notBoarded', routeId: routeId, stopName: 'D'));
+      await col.doc('stu_boarded').set(_studentDoc(attendanceStatus: 'boarded', busId: busId, stopName: 'A'));
+      await col.doc('stu_alighted').set(_studentDoc(attendanceStatus: 'alighted', busId: busId, stopName: 'B'));
+      await col.doc('stu_absent').set(_studentDoc(attendanceStatus: 'absent', busId: busId, stopName: 'C'));
+      await col.doc('stu_default').set(_studentDoc(attendanceStatus: 'notBoarded', busId: busId, stopName: 'D'));
 
-      final students = await service.studentsStream(routeId).first;
+      final students = await service.studentsStream(busId).first;
       final byId = {for (final s in students) s.id: s};
 
       expect(byId['stu_boarded']!.status, AttendanceStatus.boarded);
@@ -456,10 +460,10 @@ void main() {
 
     test('re-emits updated list when a student document changes', () async {
       final ref = fakeFirestore.collection('students').doc('stu_001');
-      await ref.set(_studentDoc(attendanceStatus: 'notBoarded', routeId: routeId));
+      await ref.set(_studentDoc(attendanceStatus: 'notBoarded', busId: busId));
 
       expect(
-        service.studentsStream(routeId),
+        service.studentsStream(busId),
         emitsInOrder([
           predicate<List<Student>>(
               (list) => list.isNotEmpty && list.first.status == AttendanceStatus.notBoarded),
@@ -477,10 +481,10 @@ void main() {
         'routeStop': 'Kigali Heights',
         'grade': 'P4',
         'attendanceStatus': 'notBoarded',
-        DriverFirestoreFields.routeId: routeId,
+        DriverFirestoreFields.busId: busId,
       });
 
-      final students = await service.studentsStream(routeId).first;
+      final students = await service.studentsStream(busId).first;
       expect(students.first.stopName, 'Kigali Heights');
     });
   });

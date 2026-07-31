@@ -93,10 +93,18 @@ void main() {
 
   /// Seeds a `routes/{routeId}` doc with [busId] and an in-progress
   /// `trips` doc for that bus, returning the trip id.
+  ///
+  /// Includes `schoolId` on both — AttendanceCacheService.syncOfflineData
+  /// filters the trips query by schoolId too, since the `trips` security
+  /// rule gates reads on it and a query missing that filter is rejected.
   Future<String> seedActiveTrip({required String routeId, required String busId}) async {
-    await fakeFs.collection(FirebaseCollections.routes).doc(routeId).set({'busId': busId});
+    await fakeFs
+        .collection(FirebaseCollections.routes)
+        .doc(routeId)
+        .set({'busId': busId, 'schoolId': 'school_1'});
     final tripRef = await fakeFs.collection(FirebaseCollections.trips).add({
       'busId': busId,
+      'schoolId': 'school_1',
       'routeId': routeId,
       'status': 'inProgress',
       'studentEvents': <String, dynamic>{},

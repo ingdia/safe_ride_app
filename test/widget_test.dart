@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:safe_ride_app/main.dart';
 import 'package:safe_ride_app/features/driver/domain/models/student.dart';
 import 'package:safe_ride_app/features/driver/presentation/providers/driver_navigation_provider.dart';
+import 'package:safe_ride_app/features/driver/presentation/providers/driver_profile_provider.dart';
 import 'package:safe_ride_app/features/driver/presentation/providers/driver_route_provider.dart';
 import 'package:safe_ride_app/features/driver/presentation/providers/driver_route_state.dart';
 import 'package:safe_ride_app/features/driver/presentation/screens/driver_dashboard_screen.dart';
@@ -24,6 +25,21 @@ void main() {
       overrides: [
         attendanceCacheProvider.overrideWithValue(FakeAttendanceCacheService()),
         connectivityProvider.overrideWith((ref) => Stream.value(true)),
+        // Avoids hitting real Firebase (unavailable in this test
+        // environment) — driverProfileProvider would otherwise error and
+        // Riverpod's automatic retry leaves a pending Timer behind after
+        // the widget tree is disposed.
+        driverProfileProvider.overrideWith((ref) => Stream.value(
+              const DriverProfile(
+                name: 'Driver',
+                role: 'Driver',
+                email: 'driver@example.com',
+                phone: '',
+                busNumber: 'Bus 12',
+                route: 'Route A',
+                license: '',
+              ),
+            )),
       ],
     );
     addTearDown(container.dispose);

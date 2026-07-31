@@ -44,7 +44,11 @@ abstract class DriverRepository {
   });
 
   /// Returns the id of a trip already `inProgress` for [busId], if any.
-  Future<String?> findActiveTripId({required String busId});
+  ///
+  /// [schoolId] should be passed whenever known — the `trips` security rule
+  /// gates reads on `schoolId`, so a query missing that filter is rejected
+  /// outright rather than just returning no results.
+  Future<String?> findActiveTripId({required String busId, String? schoolId});
 
   /// Returns the stop names already marked passed on [tripId] — lets the
   /// driver's own screen show the correct state if they reopen the app
@@ -53,9 +57,14 @@ abstract class DriverRepository {
 
   /// Creates a new `trips` document (or resumes an existing in-progress one)
   /// for the driver's assigned bus/route and returns its id.
+  ///
+  /// [schoolId] should be passed whenever the caller already has it — see
+  /// [findActiveTripId]. When omitted it's resolved from the signed-in
+  /// driver's own profile.
   Future<String> startTrip({
     required String busId,
     required String routeId,
+    String? schoolId,
   });
 
   /// Marks [tripId] as completed.

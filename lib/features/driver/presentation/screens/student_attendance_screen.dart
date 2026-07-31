@@ -120,10 +120,12 @@ class _LiveRosterBody extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Derive routeId from the notifier's resolved metadata (non-empty only
-    // when FirestoreDriverRepository successfully fetched route metadata).
+    // Derive routeId/busId from the notifier's resolved metadata (non-empty
+    // only when FirestoreDriverRepository successfully fetched route
+    // metadata). The roster stream is keyed by busId, not routeId — see
+    // DriverStreamService.studentsStream.
     final routeDataAsync = ref.watch(routeDataStreamProvider(loaded.routeId ?? ''));
-    final rosterAsync = ref.watch(studentRosterStreamProvider(loaded.routeId ?? ''));
+    final rosterAsync = ref.watch(studentRosterStreamProvider(loaded.busId ?? ''));
 
     // Resolve the student list: live Firestore roster merged with local marks,
     // or fall back to the notifier's list when the stream hasn't emitted yet.

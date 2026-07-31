@@ -122,20 +122,23 @@ class DriverStreamService {
         );
   }
 
-  /// Returns a live stream of [Student]s assigned to [routeId], ordered by
+  /// Returns a live stream of [Student]s assigned to [busId], ordered by
   /// `stopName` then `name`.
   ///
   /// Listens to the top-level `students` collection filtered by
-  /// `routeId == routeId`. Re-emits the full list on every Firestore change,
-  /// allowing the UI to reflect Admin roster edits (add / remove student)
-  /// mid-trip without a manual refresh.
+  /// `busId == busId` — not `routeId`, because the `students` security rule
+  /// only grants a driver read access via `resource.data.busId ==
+  /// myBusId()`; a query filtered on `routeId` doesn't match any branch of
+  /// that rule and Firestore rejects it outright. Re-emits the full list on
+  /// every Firestore change, allowing the UI to reflect Admin roster edits
+  /// (add / remove student) mid-trip without a manual refresh.
   ///
   /// Emits an empty list when no students match. Any [FirebaseException] is
   /// caught and re-thrown so Riverpod surfaces it as [AsyncError].
-  Stream<List<Student>> studentsStream(String routeId) {
+  Stream<List<Student>> studentsStream(String busId) {
     return _firestore
         .collection('students')
-        .where(DriverFirestoreFields.routeId, isEqualTo: routeId)
+        .where(DriverFirestoreFields.busId, isEqualTo: busId)
         .orderBy('stopName')
         .orderBy('name')
         .snapshots()

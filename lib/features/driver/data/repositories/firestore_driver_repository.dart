@@ -49,8 +49,12 @@ class FirestoreDriverRepository implements DriverRepository {
       final schoolId = data?['schoolId'] as String?;
       if (busId == null || busId.isEmpty) return {'schoolId': schoolId};
 
+      // The `routes` rule gates reads on `schoolId`, so the query must
+      // filter on it explicitly — filtering by `busId` alone is rejected
+      // outright by Firestore, not just empty.
       final routeQuery = await _firestore
           .collection(DriverFirestorePaths.routes)
+          .where('schoolId', isEqualTo: schoolId)
           .where('busId', isEqualTo: busId)
           .limit(1)
           .get();
@@ -108,9 +112,16 @@ class FirestoreDriverRepository implements DriverRepository {
   }
 
   @override
-  Future<String?> findActiveTripId({required String busId}) async {
+  Future<String?> findActiveTripId({required String busId, String? schoolId}) async {
+    // The `trips` rule gates reads on `schoolId`; a query missing that
+    // filter is rejected by Firestore outright, so resolve it first if the
+    // caller didn't already have it.
+    final resolvedSchoolId = schoolId ?? (await fetchRouteMetadata())['schoolId'];
+    if (resolvedSchoolId == null || resolvedSchoolId.isEmpty) return null;
+
     final query = await _firestore
         .collection(FirebaseCollections.trips)
+        .where('schoolId', isEqualTo: resolvedSchoolId)
         .where('busId', isEqualTo: busId)
         .where('status', isEqualTo: 'inProgress')
         .limit(1)
@@ -119,17 +130,18 @@ class FirestoreDriverRepository implements DriverRepository {
   }
 
   @override
-  Future<String> startTrip({required String busId, required String routeId}) async {
-    final existing = await findActiveTripId(busId: busId);
+  Future<String> startTrip({required String busId, required String routeId, String? schoolId}) async {
+    final metadata = await fetchRouteMetadata();
+    final resolvedSchoolId = schoolId ?? metadata['schoolId'];
+    final existing = await findActiveTripId(busId: busId, schoolId: resolvedSchoolId);
     if (existing != null) return existing;
 
-    final metadata = await fetchRouteMetadata();
     final hour = DateTime.now().hour;
     final tripRef = await _firestore.collection(FirebaseCollections.trips).add({
       'routeId': routeId,
       'busId': busId,
       'driverId': metadata['driverId'] ?? '',
-      'schoolId': metadata['schoolId'] ?? '',
+      'schoolId': resolvedSchoolId ?? '',
       'type': hour < 12 ? 'morning' : 'afternoon',
       'status': 'inProgress',
       'startedAt': FieldValue.serverTimestamp(),
