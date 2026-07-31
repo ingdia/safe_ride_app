@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../features/parent/presentation/screens/parent_navigation_shell.dart';
+import '../../features/parent/presentation/screens/parent_onboarding_screen.dart';
 
 class ParentRoutes {
   const ParentRoutes._();
@@ -8,14 +9,8 @@ class ParentRoutes {
   static const String home = '/parent/home';
   static const String tracking = '/parent/tracking';
   static const String notifications = '/parent/notifications';
-
-  static Map<String, WidgetBuilder> get routes {
-    return {
-      home: (context) => const ParentNavigationShell(),
-      tracking: (context) => const ParentNavigationShell(),
-      notifications: (context) => const ParentNavigationShell(),
-    };
-  }
+  static const String onboarding = '/parent/onboarding';
+  static const String pending = '/parent/pending';
 
   static Route<dynamic>? onGenerateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -24,6 +19,18 @@ class ParentRoutes {
       case notifications:
         return MaterialPageRoute(
           builder: (_) => const ParentNavigationShell(),
+          settings: settings,
+        );
+
+      case onboarding:
+        return MaterialPageRoute(
+          builder: (_) => const ParentOnboardingScreen(),
+          settings: settings,
+        );
+
+      case pending:
+        return MaterialPageRoute(
+          builder: (_) => const ParentPendingScreen(),
           settings: settings,
         );
 
