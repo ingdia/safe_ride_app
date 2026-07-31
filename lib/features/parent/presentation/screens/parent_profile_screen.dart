@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/routing/auth_routes.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../domain/entities/parent_child_entity.dart';
 import '../../domain/entities/parent_profile_entity.dart';
 import '../providers/parent_data_providers.dart';
@@ -51,7 +53,7 @@ class _ProfileContent extends ConsumerWidget {
           const SizedBox(height: 18),
           _ParentInfoCard(profile: profile),
           const SizedBox(height: 18),
-          _ChildrenCard(childrenState: childrenState),
+          _ChildrenCard(childrenState: childrenState, schoolId: profile.schoolId),
           const SizedBox(height: 18),
           _SettingsCard(profile: profile),
           const SizedBox(height: 18),
@@ -166,9 +168,11 @@ class _ParentInfoCard extends StatelessWidget {
 }
 
 class _ChildrenCard extends ConsumerWidget {
-  const _ChildrenCard({required this.childrenState});
+  const _ChildrenCard({required this.childrenState, required this.schoolId});
 
   final AsyncValue<List<ParentChildEntity>> childrenState;
+  final String? schoolId;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return _SectionCard(
@@ -181,7 +185,7 @@ class _ChildrenCard extends ConsumerWidget {
               const Expanded(child: _SectionTitle(title: 'Children')),
               IconButton(
                 onPressed: () {
-                  _showChildDialog(context, ref);
+                  _showChildDialog(context, ref, schoolId: schoolId);
                 },
                 icon: const Icon(
                   Icons.add_circle_outline,
@@ -269,7 +273,9 @@ class _ChildTile extends ConsumerWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${child.grade} • ${child.busNumber} • ${child.pickupStop}',
+                  child.isApproved
+                      ? '${child.grade} • ${child.busNumber ?? 'Bus TBD'} • ${child.pickupStop ?? 'Stop TBD'}'
+                      : '${child.grade} • Awaiting school approval',
                   style: TextStyle(
                     color: Colors.grey.shade700,
                     fontWeight: FontWeight.w600,
@@ -418,17 +424,17 @@ class _SettingsTile extends StatelessWidget {
   }
 }
 
-class _LogoutButton extends StatelessWidget {
+class _LogoutButton extends ConsumerWidget {
   const _LogoutButton({required this.profile});
 
   final ParentProfileEntity profile;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: OutlinedButton.icon(
-        onPressed: () => _showLogoutDialog(context, profile.fullName),
+        onPressed: () => _showLogoutDialog(context, ref, profile.fullName),
         icon: const Icon(Icons.logout),
         label: const Text('Logout & Switch Role'),
         style: OutlinedButton.styleFrom(
@@ -693,17 +699,26 @@ Future<void> _showChildDialog(
   BuildContext context,
   WidgetRef ref, {
   ParentChildEntity? child,
+  String? schoolId,
 }) async {
   final nameController = TextEditingController(text: child?.fullName ?? '');
   final gradeController = TextEditingController(text: child?.grade ?? '');
-  final busController = TextEditingController(text: child?.busNumber ?? '');
-  final stopController = TextEditingController(text: child?.pickupStop ?? '');
+  final stopController = TextEditingController();
+
+  final isEditing = child != null;
+
+  if (!isEditing && (schoolId == null || schoolId.isEmpty)) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Complete your profile before adding another child.'),
+      ),
+    );
+    return;
+  }
 
   await showDialog<void>(
     context: context,
     builder: (dialogContext) {
-      final isEditing = child != null;
-
       return AlertDialog(
         title: Text(isEditing ? 'Edit Child' : 'Add Child'),
         content: SingleChildScrollView(
@@ -712,11 +727,20 @@ Future<void> _showChildDialog(
             children: [
               _ProfileTextField(controller: nameController, label: 'Full name'),
               _ProfileTextField(controller: gradeController, label: 'Grade'),
-              _ProfileTextField(controller: busController, label: 'Bus number'),
-              _ProfileTextField(
-                controller: stopController,
-                label: 'Pickup stop',
-              ),
+              if (!isEditing) ...[
+                _ProfileTextField(
+                  controller: stopController,
+                  label: 'Pickup location (e.g. nearest landmark)',
+                ),
+                const Padding(
+                  padding: EdgeInsets.only(top: 4),
+                  child: Text(
+                    'The school will review and assign a bus, route and stop '
+                    'after approval.',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -733,8 +757,6 @@ Future<void> _showChildDialog(
                 final updatedChild = existingChild.copyWith(
                   fullName: nameController.text,
                   grade: gradeController.text,
-                  busNumber: busController.text,
-                  pickupStop: stopController.text,
                 );
 
                 await ref
@@ -746,8 +768,8 @@ Future<void> _showChildDialog(
                     .addChild(
                       fullName: nameController.text,
                       grade: gradeController.text,
-                      busNumber: busController.text,
-                      pickupStop: stopController.text,
+                      schoolId: schoolId!,
+                      requestedStop: stopController.text,
                     );
               }
 
@@ -762,7 +784,7 @@ Future<void> _showChildDialog(
                   content: Text(
                     existingChild != null
                         ? 'Child updated successfully.'
-                        : 'Child added successfully.',
+                        : 'Child submitted for school approval.',
                   ),
                 ),
               );
@@ -776,7 +798,6 @@ Future<void> _showChildDialog(
 
   nameController.dispose();
   gradeController.dispose();
-  busController.dispose();
   stopController.dispose();
 }
 
@@ -896,25 +917,29 @@ void _showInfoDialog(
   );
 }
 
-void _showLogoutDialog(BuildContext context, String parentName) {
+void _showLogoutDialog(BuildContext context, WidgetRef ref, String parentName) {
   showDialog<void>(
     context: context,
-    builder: (context) {
+    builder: (dialogContext) {
       return AlertDialog(
         title: const Text('Logout'),
         content: Text('$parentName, do you want to logout and switch role?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Logout action selected.')),
-              );
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              await ref.read(authProvider.notifier).signOut();
+              if (context.mounted) {
+                Navigator.pushNamedAndRemoveUntil(
+                  context,
+                  AuthRoutes.login,
+                  (_) => false,
+                );
+              }
             },
             child: const Text('Logout'),
           ),

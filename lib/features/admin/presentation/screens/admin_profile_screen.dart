@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../providers/users_provider.dart';
+import '../../../../core/routing/auth_routes.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
+import '../providers/admin_session_provider.dart';
 import '../widgets/admin_ui_constants.dart';
+import 'admin_notifications_screen.dart';
 import 'app_settings_screen.dart';
 import 'help_support_screen.dart';
 import 'notification_preferences_screen.dart';
+import 'reports_analytics_screen.dart';
 
 void _showComingSoon(BuildContext context, String feature) {
   ScaffoldMessenger.of(context).showSnackBar(
@@ -62,8 +66,34 @@ class ProfileScreen extends ConsumerWidget {
                         ),
                         const SizedBox(height: AdminUiSpacing.sm),
                         _SettingsTile(
+                          icon: Icons.notifications_active_outlined,
+                          title: 'Alerts',
+                          subtitle: 'Recent activity across your school',
+                          onTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const NotificationsScreen(),
+                              ),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: AdminUiSpacing.sm),
+                        _SettingsTile(
+                          icon: Icons.bar_chart_rounded,
+                          title: 'Reports & Analytics',
+                          subtitle: 'Attendance and on-time performance',
+                          onTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const ReportsAnalyticsScreen(),
+                              ),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: AdminUiSpacing.sm),
+                        _SettingsTile(
                           icon: Icons.notifications_none_rounded,
-                          title: 'Notifications',
+                          title: 'Notification Preferences',
                           subtitle: 'Manage alert preferences',
                           onTap: () {
                             Navigator.of(context).push(
@@ -112,7 +142,16 @@ class ProfileScreen extends ConsumerWidget {
                         SizedBox(
                           width: double.infinity,
                           child: OutlinedButton.icon(
-                            onPressed: () => _showComingSoon(context, 'Logout'),
+                            onPressed: () async {
+                              await ref.read(authProvider.notifier).signOut();
+                              if (context.mounted) {
+                                Navigator.pushNamedAndRemoveUntil(
+                                  context,
+                                  AuthRoutes.login,
+                                  (_) => false,
+                                );
+                              }
+                            },
                             style: OutlinedButton.styleFrom(
                               foregroundColor: AdminUiColors.dangerFg,
                               side: const BorderSide(

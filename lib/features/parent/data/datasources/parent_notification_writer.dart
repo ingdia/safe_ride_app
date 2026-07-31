@@ -1,96 +1,32 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-import '../models/parent_notification_create_model.dart';
+import '../../../../core/firebase/firebase_collections.dart';
 import 'parent_firestore_fields.dart';
-import 'parent_firestore_paths.dart';
 
+/// Persists notification records to Firestore's `notifications` collection
+/// so they show up in the parent's in-app notification history. Actual
+/// on-device alerts are separately handled by [NotificationService] — this
+/// writer is only responsible for the persisted record, not the local push.
 class ParentNotificationWriter {
   ParentNotificationWriter({FirebaseFirestore? firestore})
-    : _firestore = firestore ?? FirebaseFirestore.instance;
+      : _firestore = firestore ?? FirebaseFirestore.instance;
 
   final FirebaseFirestore _firestore;
 
-  Future<void> createNotification(
-    ParentNotificationCreateModel notification,
-  ) async {
-    await _firestore.collection(ParentFirestorePaths.notifications).add({
-      ParentNotificationFields.parentId: notification.parentId,
-      ParentNotificationFields.title: notification.title,
-      ParentNotificationFields.message: notification.message,
-      ParentNotificationFields.type: notification.type,
+  Future<void> createNotification({
+    required String parentId,
+    required String title,
+    required String message,
+    required String type,
+  }) async {
+    await _firestore.collection(FirebaseCollections.notifications).add({
+      ParentNotificationFields.parentId: parentId,
+      ParentNotificationFields.title: title,
+      ParentNotificationFields.message: message,
+      ParentNotificationFields.type: type,
       ParentNotificationFields.isRead: false,
-      ParentNotificationFields.source: 'parent_backend_integration',
+      ParentNotificationFields.source: 'saferide',
       ParentNotificationFields.createdAt: FieldValue.serverTimestamp(),
     });
-  }
-
-  Future<void> createBoardedNotification({
-    required String childName,
-    required String busNumber,
-    required String stopName,
-  }) {
-    return createNotification(
-      ParentNotificationCreateModel(
-        parentId: ParentFirestorePaths.activeParentId,
-        title: 'Student boarded',
-        message: '$childName boarded $busNumber at $stopName.',
-        type: 'boarded',
-      ),
-    );
-  }
-
-  Future<void> createBusMovedNotification({
-    required String busNumber,
-    required String currentStop,
-    required String nextStop,
-  }) {
-    return createNotification(
-      ParentNotificationCreateModel(
-        parentId: ParentFirestorePaths.activeParentId,
-        title: 'Bus location updated',
-        message: '$busNumber is now at $currentStop. Next stop: $nextStop.',
-        type: 'general',
-      ),
-    );
-  }
-
-  Future<void> createDelayNotification({
-    required String busNumber,
-    required String eta,
-  }) {
-    return createNotification(
-      ParentNotificationCreateModel(
-        parentId: ParentFirestorePaths.activeParentId,
-        title: 'Bus delayed',
-        message: '$busNumber is delayed. New estimated arrival time is $eta.',
-        type: 'delay',
-      ),
-    );
-  }
-
-  Future<void> createArrivalNotification({
-    required String childName,
-    required String schoolName,
-  }) {
-    return createNotification(
-      ParentNotificationCreateModel(
-        parentId: ParentFirestorePaths.activeParentId,
-        title: 'Safe arrival',
-        message: '$childName arrived safely at $schoolName.',
-        type: 'dropped',
-      ),
-    );
-  }
-
-  Future<void> createEmergencyNotification({required String busNumber}) {
-    return createNotification(
-      ParentNotificationCreateModel(
-        parentId: ParentFirestorePaths.activeParentId,
-        title: 'Emergency alert',
-        message:
-            'Emergency alert reported for $busNumber. Please contact support.',
-        type: 'emergency',
-      ),
-    );
   }
 }

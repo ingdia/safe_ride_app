@@ -1,65 +1,65 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
+import '../../../../core/firebase/firebase_collections.dart';
 import '../../domain/models/route_stop.dart';
 import '../../domain/models/student.dart';
 import '../../domain/repositories/driver_repository.dart';
 import '../datasources/driver_firestore_paths.dart';
-import '../datasources/driver_firestore_fields.dart';
 
 /// Firestore-backed implementation of [DriverRepository].
 ///
-/// ## Attendance flow
+/// ## Route/bus resolution
 ///
-/// When the driver marks a student the following writes happen atomically in
-/// sequence:
+/// Every read/write below is scoped to the *signed-in driver's own*
+/// assignment — resolved via [fetchRouteMetadata] from
+/// `users/{uid}.busId`, then the `routes` document with a matching `busId`.
+/// This is what keeps one driver from ever seeing another route's roster.
 ///
-/// 1. A new document is created in
-///    `routes/{routeId}/attendance/{auto-id}` (or the top-level `attendance`
-///    collection when [routeId] is unavailable). The document contains all
-///    fields defined in [DriverFirestoreFields] so the ERD structure is
-///    preserved.
-/// 2. The canonical `students/{studentId}` document has its `status` field
-///    updated so that Admin and Parent Firestore listeners reflect the change
-///    in real time without querying the subcollection.
+/// ## Trip lifecycle
 ///
-/// [AttendanceStatus.notBoarded] is treated as a client-side reset and
-/// produces **no** Firestore write.
-///
-/// ## GPS flow
-///
-/// [updateBusLocation] merges `{ busLocation: { latitude, longitude },
-/// lastUpdatedAt: serverTimestamp }` into `buses/{busId}` using
-/// [SetOptions.merge], so existing bus metadata is never overwritten.
-/// The write is skipped when [busId] cannot be resolved from route metadata.
-///
-/// ## Route-metadata resolution
-///
-/// Both write methods accept optional [routeId] and [busId] parameters. When
-/// they are omitted or empty, [fetchRouteMetadata] queries the first document
-/// in the `routes` collection to resolve them. Callers that already hold the
-/// IDs (e.g. [DriverRouteNotifier]) should pass them directly to avoid the
-/// extra round-trip.
+/// [startTrip]/[endTrip] manage the canonical `trips/{tripId}` document the
+/// parent app streams from. [updateStudentAttendanceStatus] writes into that
+/// same document's `studentEvents` map so boarding/drop-off events reach the
+/// parent in real time; [updateBusLocation] writes to `busLocations/{busId}`
+/// on every GPS tick, which is what the parent's live map renders.
 class FirestoreDriverRepository implements DriverRepository {
-  FirestoreDriverRepository({FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+  FirestoreDriverRepository({FirebaseFirestore? firestore, FirebaseAuth? auth})
+      : _firestore = firestore ?? FirebaseFirestore.instance,
+        _authOverride = auth;
 
   final FirebaseFirestore _firestore;
+  // Resolved lazily (not in the constructor) so constructing this repository
+  // never requires a live Firebase App — only actually calling a method that
+  // needs the signed-in user does, and that path already fails safe via the
+  // try/catch in fetchRouteMetadata.
+  final FirebaseAuth? _authOverride;
+  FirebaseAuth get _auth => _authOverride ?? FirebaseAuth.instance;
 
-  /// Fetches the first route document and returns its ID and associated
-  /// [busId]. Returns an empty map when no routes exist or on error.
+  /// Resolves the signed-in driver's own `busId`/`routeId`/`schoolId`.
+  /// Returns an empty map when not authenticated or not yet assigned.
   Future<Map<String, String?>> fetchRouteMetadata() async {
     try {
-      final query = await _firestore
+      final uid = _auth.currentUser?.uid;
+      if (uid == null) return {};
+
+      final userDoc = await _firestore.collection(FirebaseCollections.users).doc(uid).get();
+      final data = userDoc.data();
+      final busId = data?['busId'] as String?;
+      final schoolId = data?['schoolId'] as String?;
+      if (busId == null || busId.isEmpty) return {'schoolId': schoolId};
+
+      final routeQuery = await _firestore
           .collection(DriverFirestorePaths.routes)
+          .where('busId', isEqualTo: busId)
           .limit(1)
           .get();
 
-      if (query.docs.isEmpty) return {};
-      final doc = query.docs.first;
-      final data = doc.data();
       return {
-        'routeId': doc.id,
-        'busId': data['busId'] as String?,
+        'busId': busId,
+        'schoolId': schoolId,
+        'routeId': routeQuery.docs.isNotEmpty ? routeQuery.docs.first.id : null,
+        'driverId': uid,
       };
     } catch (_) {
       return {};
@@ -69,29 +69,21 @@ class FirestoreDriverRepository implements DriverRepository {
   @override
   Future<List<RouteStop>> fetchRouteStops() async {
     try {
-      final query = await _firestore.collection(DriverFirestorePaths.routes).get();
+      final metadata = await fetchRouteMetadata();
+      final routeId = metadata['routeId'];
+      if (routeId == null || routeId.isEmpty) return <RouteStop>[];
 
-      final stops = query.docs.map((doc) {
-        final data = doc.data();
+      final doc = await _firestore.collection(DriverFirestorePaths.routes).doc(routeId).get();
+      final data = doc.data();
+      if (data == null || data['stops'] is! List) return <RouteStop>[];
 
-        // Support two document shapes:
-        // 1) Each document IS a stop (top-level fields).
-        // 2) A route document contains a `stops` list field.
-
-        if (data.containsKey('stops') && data['stops'] is List) {
-          final rawStops = data['stops'] as List;
-          return rawStops.map((s) => _mapRouteStopFromMap(s as Map<String, dynamic>)).toList();
-        }
-
-        return [_mapRouteStopFromMap(data)];
-      }).expand((e) => e).toList();
-
-      // Ensure ordering by `order` field.
-      stops.sort((a, b) => a.order.compareTo(b.order));
-
+      final stops = (data['stops'] as List)
+          .whereType<Map<String, dynamic>>()
+          .map(_mapRouteStopFromMap)
+          .toList()
+        ..sort((a, b) => a.order.compareTo(b.order));
       return stops;
     } catch (_) {
-      // Return an empty list if Firestore fails (including web JS interop issues).
       return <RouteStop>[];
     }
   }
@@ -99,110 +91,112 @@ class FirestoreDriverRepository implements DriverRepository {
   @override
   Future<List<Student>> fetchRouteStudents() async {
     try {
-      // Try to read a top-level `students` collection; if it doesn't exist return empty list.
-      final collectionRef = _firestore.collection('students');
-      final snapshot = await collectionRef.get();
+      final metadata = await fetchRouteMetadata();
+      final busId = metadata['busId'];
+      if (busId == null || busId.isEmpty) return <Student>[];
 
-      final students = snapshot.docs.map((doc) => _mapStudentFromDoc(doc)).toList();
-      return students;
+      final snapshot = await _firestore
+          .collection(FirebaseCollections.students)
+          .where('busId', isEqualTo: busId)
+          .where('status', isEqualTo: 'approved')
+          .get();
+
+      return snapshot.docs.map(_mapStudentFromDoc).toList();
     } catch (_) {
       return <Student>[];
     }
   }
 
-  /// Records an attendance event for [studentId] in Firestore.
-  ///
-  /// **Write 1 — attendance subcollection:**
-  /// Creates a document at `routes/{routeId}/attendance/{auto-id}` containing
-  /// all ERD fields ([DriverFirestoreFields]). Falls back to the top-level
-  /// `attendance` collection when [routeId] is empty.
-  ///
-  /// **Write 2 — canonical student document:**
-  /// Updates `students/{studentId}.status` so Admin and Parent listeners
-  /// receive the change via their existing Firestore snapshots.
-  ///
-  /// [AttendanceStatus.notBoarded] skips both writes and returns a stub
-  /// [Student] immediately.
+  @override
+  Future<String?> findActiveTripId({required String busId}) async {
+    final query = await _firestore
+        .collection(FirebaseCollections.trips)
+        .where('busId', isEqualTo: busId)
+        .where('status', isEqualTo: 'inProgress')
+        .limit(1)
+        .get();
+    return query.docs.isEmpty ? null : query.docs.first.id;
+  }
+
+  @override
+  Future<String> startTrip({required String busId, required String routeId}) async {
+    final existing = await findActiveTripId(busId: busId);
+    if (existing != null) return existing;
+
+    final metadata = await fetchRouteMetadata();
+    final hour = DateTime.now().hour;
+    final tripRef = await _firestore.collection(FirebaseCollections.trips).add({
+      'routeId': routeId,
+      'busId': busId,
+      'driverId': metadata['driverId'] ?? '',
+      'schoolId': metadata['schoolId'] ?? '',
+      'type': hour < 12 ? 'morning' : 'afternoon',
+      'status': 'inProgress',
+      'startedAt': FieldValue.serverTimestamp(),
+      'studentEvents': <String, dynamic>{},
+    });
+    return tripRef.id;
+  }
+
+  @override
+  Future<void> endTrip(String tripId) async {
+    await _firestore.collection(FirebaseCollections.trips).doc(tripId).set({
+      'status': 'completed',
+      'completedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  @override
+  Future<void> markStopCompleted({required String tripId, required String stopName}) async {
+    await _firestore.collection(FirebaseCollections.trips).doc(tripId).update({
+      'stopsCompleted': FieldValue.arrayUnion([stopName]),
+    });
+  }
+
+  @override
+  Future<List<String>> fetchStopsCompleted(String tripId) async {
+    final doc = await _firestore.collection(FirebaseCollections.trips).doc(tripId).get();
+    final raw = doc.data()?['stopsCompleted'] as List<dynamic>? ?? [];
+    return raw.map((e) => e as String).toList();
+  }
+
   @override
   Future<Student> updateStudentAttendanceStatus(
     String studentId,
     AttendanceStatus status, {
     String? routeId,
     String? busId,
+    String? tripId,
   }) async {
     if (status == AttendanceStatus.notBoarded) {
-      return Student(
-        id: studentId,
-        name: '',
-        stopName: '',
-        grade: '',
-        status: status,
-      );
+      return Student(id: studentId, name: '', stopName: '', grade: '', status: status);
     }
 
     final statusValue = _attendanceStatusToString(status);
-    final metadata = (routeId != null && routeId.isNotEmpty)
-        ? {'routeId': routeId, 'busId': busId}
-        : await fetchRouteMetadata();
-    final resolvedRouteId = metadata['routeId'] ?? '';
-    final resolvedBusId = metadata['busId'] ?? '';
 
     try {
-      final collection = resolvedRouteId.isNotEmpty
-          ? _firestore.collection(DriverFirestorePaths.routeAttendanceCollection(resolvedRouteId))
-          : _firestore.collection(DriverFirestorePaths.attendance);
-      final attendanceRef = collection.doc();
-
-      final data = <String, dynamic>{
-        DriverFirestoreFields.attendanceId: attendanceRef.id,
-        DriverFirestoreFields.studentId: studentId,
-        DriverFirestoreFields.status: statusValue,
-        DriverFirestoreFields.timestamp: FieldValue.serverTimestamp(),
-        DriverFirestoreFields.recordedBy: 'driver_app',
-        DriverFirestoreFields.date: DateTime.now().toIso8601String(),
-        DriverFirestoreFields.routeId: resolvedRouteId,
-        DriverFirestoreFields.busId: resolvedBusId,
-      };
-
-      await attendanceRef.set(data);
-
-      // If a `students/{studentId}` document exists, update its status field to keep canonical state.
-      final studentDocRef = _firestore.collection('students').doc(studentId);
-      final studentSnapshot = await studentDocRef.get();
-
-      if (studentSnapshot.exists) {
-        await studentDocRef.update({
-          'status': statusValue,
+      if (tripId != null && tripId.isNotEmpty) {
+        await _firestore.collection(FirebaseCollections.trips).doc(tripId).update({
+          'studentEvents.$studentId': statusValue == 'boarded' ? 'boarded' : 'droppedOff',
         });
+      }
+
+      // Note: uses a distinct `attendanceStatus` field, not `status` — the
+      // `status` field on a student doc means pending/approved/rejected
+      // (school-approval state) and must never be overwritten here.
+      final studentDocRef = _firestore.collection(FirebaseCollections.students).doc(studentId);
+      final studentSnapshot = await studentDocRef.get();
+      if (studentSnapshot.exists) {
+        await studentDocRef.update({'attendanceStatus': statusValue});
         return _mapStudentFromDoc(await studentDocRef.get());
       }
 
-      return Student(
-        id: studentId,
-        name: '',
-        stopName: '',
-        grade: '',
-        status: status,
-      );
+      return Student(id: studentId, name: '', stopName: '', grade: '', status: status);
     } catch (_) {
-      return Student(
-        id: studentId,
-        name: '',
-        stopName: '',
-        grade: '',
-        status: status,
-      );
+      return Student(id: studentId, name: '', stopName: '', grade: '', status: status);
     }
   }
 
-  /// Merges the bus's current GPS coordinates into `buses/{busId}`.
-  ///
-  /// Uses [SetOptions.merge] so only [DriverFirestoreFields.busLocation] and
-  /// [DriverFirestoreFields.lastUpdatedAt] are touched; all other fields on
-  /// the bus document are preserved.
-  ///
-  /// The write is skipped silently when [busId] cannot be resolved from
-  /// [routeId] or [fetchRouteMetadata].
   @override
   Future<void> updateBusLocation(
     double latitude,
@@ -210,25 +204,17 @@ class FirestoreDriverRepository implements DriverRepository {
     String? routeId,
     String? busId,
   }) async {
-    final metadata = (routeId != null && routeId.isNotEmpty)
-        ? {'routeId': routeId, 'busId': busId}
-        : await fetchRouteMetadata();
-    final resolvedBusId = metadata['busId'] ?? '';
+    final resolvedBusId = (busId != null && busId.isNotEmpty)
+        ? busId
+        : (await fetchRouteMetadata())['busId'] ?? '';
 
-    if (resolvedBusId.isEmpty) {
-      return;
-    }
+    if (resolvedBusId.isEmpty) return;
 
-    final busDoc = _firestore.collection(DriverFirestorePaths.buses).doc(resolvedBusId);
-    final data = <String, dynamic>{
-      DriverFirestoreFields.busLocation: {
-        DriverFirestoreFields.latitude: latitude,
-        DriverFirestoreFields.longitude: longitude,
-      },
-      DriverFirestoreFields.lastUpdatedAt: FieldValue.serverTimestamp(),
-    };
-
-    await busDoc.set(data, SetOptions(merge: true));
+    await _firestore.collection(FirebaseCollections.busLocations).doc(resolvedBusId).set({
+      'lat': latitude,
+      'lng': longitude,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
   }
 
   RouteStop _mapRouteStopFromMap(Map<String, dynamic> data) {
@@ -261,28 +247,26 @@ class FirestoreDriverRepository implements DriverRepository {
   Student _mapStudentFromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data() ?? {};
     final id = doc.id;
-    final name = (data['name'] as String?) ?? (data['studentId'] as String?) ?? '';
-    final stopName = (data['stopName'] as String?) ?? (data['routeStop'] as String?) ?? '';
+    final name = (data['name'] as String?) ?? '';
+    final stopName = (data['stopName'] as String?) ?? '';
     final grade = (data['grade'] as String?) ?? '';
-    final statusStr = (data['status'] as String?) ?? 'notBoarded';
-
-    final status = _attendanceStatusFromString(statusStr);
+    final statusStr = (data['attendanceStatus'] as String?) ?? 'notBoarded';
 
     return Student(
       id: id,
       name: name,
       stopName: stopName,
       grade: grade,
-      status: status,
+      status: _attendanceStatusFromString(statusStr),
     );
   }
 
   AttendanceStatus _attendanceStatusFromString(String value) {
     switch (value) {
-      case DriverFirestoreFields.boarded:
+      case 'boarded':
         return AttendanceStatus.boarded;
-      case DriverFirestoreFields.alighted:
-      case DriverFirestoreFields.absent:
+      case 'alighted':
+      case 'absent':
         return AttendanceStatus.absent;
       default:
         return AttendanceStatus.notBoarded;
@@ -292,11 +276,11 @@ class FirestoreDriverRepository implements DriverRepository {
   String _attendanceStatusToString(AttendanceStatus status) {
     switch (status) {
       case AttendanceStatus.boarded:
-        return DriverFirestoreFields.boarded;
+        return 'boarded';
       case AttendanceStatus.absent:
-        return DriverFirestoreFields.alighted;
+        return 'alighted';
       case AttendanceStatus.notBoarded:
-        return DriverFirestoreFields.alighted;
+        return 'alighted';
     }
   }
 }

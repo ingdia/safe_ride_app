@@ -5,6 +5,7 @@ import '../../data/models/user_model.dart';
 import 'buses_provider.dart';
 import 'users_provider.dart';
 import 'routes_provider.dart';
+import 'school_students_provider.dart';
 
 enum FleetBusStatus { onTime, delayed }
 
@@ -30,22 +31,6 @@ class FleetBusSummary {
   });
 }
 
-final Map<String, int> _mockStudentCounts = {
-  'bus-12': 18,
-  'bus-07': 22,
-  'bus-15': 20,
-  'bus-03': 16,
-};
-
-final Map<String, FleetBusStatus> _mockStatuses = {
-  'bus-12': FleetBusStatus.onTime,
-  'bus-07': FleetBusStatus.delayed,
-  'bus-15': FleetBusStatus.onTime,
-  'bus-03': FleetBusStatus.onTime,
-};
-
-final Map<String, String> _mockStatusNotes = {'bus-07': 'Delayed by 8 minutes'};
-
 BusModel? _findBus(List<BusModel> buses, String busId) {
   for (final bus in buses) {
     if (bus.busId == busId) return bus;
@@ -62,8 +47,14 @@ UserModel? _findDriver(List<UserModel> users, String driverId) {
 
 final fleetSummaryProvider = Provider<List<FleetBusSummary>>((ref) {
   final buses = ref.watch(busesProvider);
-  final users = ref.watch(usersProvider);
+  final users = ref.watch(driversProvider);
   final routes = ref.watch(routesProvider);
+  final students = ref
+      .watch(schoolStudentsProvider)
+      .maybeWhen(data: (v) => v, orElse: () => const []);
+
+  int studentCountFor(String busId) =>
+      students.where((s) => s.isApproved && s.busId == busId).length;
 
   final summaries = <FleetBusSummary>[];
   final assignedBusIds = <String>{};
@@ -79,11 +70,10 @@ final fleetSummaryProvider = Provider<List<FleetBusSummary>>((ref) {
         busId: bus.busId,
         plateNumber: bus.plateNumber,
         driverName: driver?.name ?? 'Unassigned',
-        studentCount: _mockStudentCounts[bus.busId] ?? 0,
+        studentCount: studentCountFor(bus.busId),
         capacity: bus.capacity,
         routeName: route.name,
-        status: _mockStatuses[bus.busId] ?? FleetBusStatus.onTime,
-        statusNote: _mockStatusNotes[bus.busId],
+        status: FleetBusStatus.onTime,
       ),
     );
   }
@@ -99,11 +89,10 @@ final fleetSummaryProvider = Provider<List<FleetBusSummary>>((ref) {
         busId: bus.busId,
         plateNumber: bus.plateNumber,
         driverName: driver?.name ?? 'Unassigned',
-        studentCount: _mockStudentCounts[bus.busId] ?? 0,
+        studentCount: studentCountFor(bus.busId),
         capacity: bus.capacity,
         routeName: 'No route assigned',
-        status: _mockStatuses[bus.busId] ?? FleetBusStatus.onTime,
-        statusNote: _mockStatusNotes[bus.busId],
+        status: FleetBusStatus.onTime,
       ),
     );
   }

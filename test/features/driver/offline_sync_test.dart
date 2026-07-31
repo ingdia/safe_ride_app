@@ -8,13 +8,13 @@ library;
 
 import 'dart:io';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive/hive.dart';
+import 'package:safe_ride_app/core/firebase/firebase_collections.dart';
 import 'package:safe_ride_app/features/driver/data/datasources/attendance_cache_service.dart';
-import 'package:safe_ride_app/features/driver/data/datasources/driver_firestore_fields.dart';
-import 'package:safe_ride_app/features/driver/data/datasources/driver_firestore_paths.dart';
 import 'package:safe_ride_app/features/driver/data/models/cached_attendance_record.dart';
 import 'package:safe_ride_app/features/driver/data/repositories/mock_driver_repository.dart';
 import 'package:safe_ride_app/features/driver/domain/models/student.dart';
@@ -75,22 +75,33 @@ class _PartialFailCache extends FakeAttendanceCacheService {
       if (entry.key == failStudentId) continue; // simulate write failure
 
       final record = entry.value;
-      final statusValue = record.statusIndex == AttendanceStatus.boarded.index
-          ? DriverFirestoreFields.boarded
-          : DriverFirestoreFields.alighted;
-      final col = record.routeId.isNotEmpty
-          ? _fakeFs.collection(
-              DriverFirestorePaths.routeAttendanceCollection(record.routeId))
-          : _fakeFs.collection(DriverFirestorePaths.attendance);
-      final ref = col.doc();
-      await ref.set({
-        DriverFirestoreFields.attendanceId: ref.id,
-        DriverFirestoreFields.studentId: record.studentId,
-        DriverFirestoreFields.routeId: record.routeId,
-        DriverFirestoreFields.status: statusValue,
-        DriverFirestoreFields.date: record.recordedAt.toIso8601String(),
-        DriverFirestoreFields.recordedBy: 'driver_app',
-      });
+      final statusValue =
+          record.statusIndex == AttendanceStatus.boarded.index ? 'boarded' : 'alighted';
+
+      if (record.routeId.isNotEmpty) {
+        final routeDoc =
+            await _fakeFs.collection(FirebaseCollections.routes).doc(record.routeId).get();
+        final busId = routeDoc.data()?['busId'] as String?;
+        if (busId != null && busId.isNotEmpty) {
+          final tripQuery = await _fakeFs
+              .collection(FirebaseCollections.trips)
+              .where('busId', isEqualTo: busId)
+              .where('status', isEqualTo: 'inProgress')
+              .limit(1)
+              .get();
+          if (tripQuery.docs.isNotEmpty) {
+            await tripQuery.docs.first.reference.update({
+              'studentEvents.${record.studentId}':
+                  statusValue == 'boarded' ? 'boarded' : 'droppedOff',
+            });
+          }
+        }
+      }
+
+      await _fakeFs
+          .collection(FirebaseCollections.students)
+          .doc(record.studentId)
+          .set({'attendanceStatus': statusValue}, SetOptions(merge: true));
       await deleteRecord(record.studentId);
     }
   }
@@ -185,35 +196,36 @@ void main() {
 
     tearDown(() => Hive.deleteBoxFromDisk('offline_attendance'));
 
-    test('syncOfflineData writes attendance doc and updates student status', () async {
+    test('syncOfflineData sets the trip studentEvents entry and attendanceStatus', () async {
       await fakeFs
           .collection('students')
           .doc('s1')
-          .set({'name': 'Alice', 'status': 'notBoarded'});
+          .set({'name': 'Alice', 'status': 'approved'});
+      await fakeFs.collection(FirebaseCollections.routes).doc('r1').set({'busId': 'bus_1'});
+      final tripRef = await fakeFs.collection(FirebaseCollections.trips).add({
+        'busId': 'bus_1',
+        'routeId': 'r1',
+        'status': 'inProgress',
+        'studentEvents': <String, dynamic>{},
+      });
 
       await realCache.saveRecord(
           buildRecord('s1', AttendanceStatus.boarded, routeId: 'r1'));
       await realCache.syncOfflineData(fakeFs);
 
-      final docs = await fakeFs
-          .collection(DriverFirestorePaths.routeAttendanceCollection('r1'))
-          .get();
-      expect(docs.docs.length, 1);
-      expect(docs.docs.first.data()[DriverFirestoreFields.studentId], 's1');
-      expect(docs.docs.first.data()[DriverFirestoreFields.status],
-          DriverFirestoreFields.boarded);
+      final tripDoc = await fakeFs.collection(FirebaseCollections.trips).doc(tripRef.id).get();
+      expect(tripDoc.data()!['studentEvents'], {'s1': 'boarded'});
 
       final studentDoc =
           await fakeFs.collection('students').doc('s1').get();
-      expect(studentDoc.data()![DriverFirestoreFields.status],
-          DriverFirestoreFields.boarded);
+      expect(studentDoc.data()!['attendanceStatus'], 'boarded');
     });
 
     test('synced record is removed from cache after successful push', () async {
       await fakeFs
           .collection('students')
           .doc('s1')
-          .set({'name': 'Alice', 'status': 'notBoarded'});
+          .set({'name': 'Alice', 'status': 'approved'});
 
       await realCache.saveRecord(
           buildRecord('s1', AttendanceStatus.boarded, routeId: 'r1'));
@@ -313,9 +325,7 @@ void main() {
 
       await cache.syncOfflineData();
 
-      final docs = await fakeFs
-          .collection(DriverFirestorePaths.routeAttendanceCollection('r1'))
-          .get();
+      final docs = await fakeFs.collection(FirebaseCollections.trips).get();
       expect(docs.docs, isEmpty);
       // synced record untouched in cache (not deleted by sync)
       expect((await cache.loadAll()).containsKey('s1'), isTrue);
@@ -325,8 +335,7 @@ void main() {
       final cache = FakeAttendanceCacheService();
       await cache.syncOfflineData();
 
-      final docs =
-          await fakeFs.collection(DriverFirestorePaths.attendance).get();
+      final docs = await fakeFs.collection(FirebaseCollections.trips).get();
       expect(docs.docs, isEmpty);
     });
   });

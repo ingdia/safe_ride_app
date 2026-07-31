@@ -17,8 +17,6 @@ class ParentProfileActions {
 
     await repository.updateParentProfile(profile.trimmed());
 
-    _ref
-      ..invalidate(parentProfileProvider)
-      ..invalidate(parentProfileStreamProvider);
+    _ref.invalidate(parentProfileStreamProvider);
   }
 }

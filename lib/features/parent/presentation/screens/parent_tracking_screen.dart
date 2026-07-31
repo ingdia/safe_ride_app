@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:latlong2/latlong.dart' as latlong;
 
-import '../../domain/entities/parent_trip_action_type.dart';
 import '../../domain/entities/parent_trip_entity.dart';
 import '../providers/parent_data_providers.dart';
-import '../providers/parent_trip_notification_actions_provider.dart';
 import '../widgets/parent_ui_constants.dart';
 
 class ParentTrackingScreen extends ConsumerWidget {
@@ -18,84 +18,48 @@ class ParentTrackingScreen extends ConsumerWidget {
       backgroundColor: ParentUiColors.background,
       body: SafeArea(
         child: tripState.when(
-          loading: () =>
-              _TrackingContent(trip: _fallbackTrip('Waiting for live data...')),
-          error: (error, stackTrace) =>
-              _TrackingContent(trip: _fallbackTrip('Using offline fallback')),
-          data: (trip) => _TrackingContent(trip: trip),
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (error, stackTrace) => Center(
+            child: Text('Unable to load live tracking.\n$error', textAlign: TextAlign.center),
+          ),
+          data: (trip) {
+            if (trip == null) {
+              return const _NoApprovedChildState();
+            }
+            return _TrackingContent(trip: trip);
+          },
         ),
       ),
     );
   }
+}
 
-  ParentTripEntity _fallbackTrip(String label) {
-    return ParentTripEntity(
-      tripId: 'trip_001',
-      childName: 'Ineza Uwase',
-      schoolName: 'Kigali Parents School',
-      grade: 'Primary 4',
-      busNumber: 'Bus #12',
-      driverName: 'Jean Bosco',
-      currentStop: 'Remera',
-      nextStop: 'Giporoso',
-      eta: '8:15 AM',
-      stopsAway: 4,
-      progress: 0.42,
-      status: ParentTripStatus.onTime,
-      busLatitude: -1.9565,
-      busLongitude: 30.1044,
-      lastUpdatedLabel: label,
-      routeStops: const [
-        ParentRouteStopEntity(
-          id: 'stop_001',
-          name: 'Kacyiru',
-          time: '3 students',
-          status: ParentRouteStopStatus.completed,
-          position: 1,
+class _NoApprovedChildState extends StatelessWidget {
+  const _NoApprovedChildState();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.map_outlined, size: 48, color: ParentUiColors.orange),
+            const SizedBox(height: 16),
+            const Text(
+              'Nothing to track yet',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Live tracking appears once the school approves your child.',
+              style: TextStyle(color: Colors.grey.shade600),
+              textAlign: TextAlign.center,
+            ),
+          ],
         ),
-        ParentRouteStopEntity(
-          id: 'stop_002',
-          name: 'Gishushu',
-          time: '2 students',
-          status: ParentRouteStopStatus.completed,
-          position: 2,
-        ),
-        ParentRouteStopEntity(
-          id: 'stop_003',
-          name: 'Remera',
-          time: '4 students',
-          status: ParentRouteStopStatus.current,
-          position: 3,
-        ),
-        ParentRouteStopEntity(
-          id: 'stop_004',
-          name: 'Giporoso',
-          time: '2 students',
-          status: ParentRouteStopStatus.upcoming,
-          position: 4,
-        ),
-        ParentRouteStopEntity(
-          id: 'stop_005',
-          name: 'Kimironko',
-          time: '3 students',
-          status: ParentRouteStopStatus.upcoming,
-          position: 5,
-        ),
-        ParentRouteStopEntity(
-          id: 'stop_006',
-          name: 'Kibagabaga',
-          time: '2 students',
-          status: ParentRouteStopStatus.upcoming,
-          position: 6,
-        ),
-        ParentRouteStopEntity(
-          id: 'stop_007',
-          name: 'Kigali Parents School',
-          time: 'School arrival',
-          status: ParentRouteStopStatus.upcoming,
-          position: 7,
-        ),
-      ],
+      ),
     );
   }
 }
@@ -115,11 +79,9 @@ class _TrackingContent extends StatelessWidget {
           const SizedBox(height: 18),
           _LiveMapCard(trip: trip),
           const SizedBox(height: 18),
-          const _DemoTripActions(),
-          const SizedBox(height: 18),
           _CurrentTripCard(trip: trip),
           const SizedBox(height: 18),
-          _RouteStopsCard(stops: trip.routeStops),
+          if (trip.routeStops.isNotEmpty) _RouteStopsCard(stops: trip.routeStops),
         ],
       ),
     );
@@ -159,6 +121,15 @@ class _TrackingHeader extends StatelessWidget {
               fontSize: 15,
             ),
           ),
+          const SizedBox(height: 4),
+          Text(
+            trip.legLabel,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.85),
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
           const SizedBox(height: 14),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
@@ -194,237 +165,63 @@ class _LiveMapCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasLocation = trip.busLatitude != null && trip.busLongitude != null;
+    final busPoint = hasLocation
+        ? latlong.LatLng(trip.busLatitude!, trip.busLongitude!)
+        : const latlong.LatLng(0, 0);
+
     return _SectionCard(
       child: Column(
         children: [
-          Container(
-            height: 230,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: ParentUiColors.orange.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(
-                color: ParentUiColors.orange.withValues(alpha: 0.2),
-              ),
-            ),
-            child: Stack(
-              children: [
-                const Positioned.fill(
-                  child: Center(
-                    child: Icon(
-                      Icons.map_outlined,
-                      size: 96,
-                      color: ParentUiColors.orange,
-                    ),
-                  ),
-                ),
-                Positioned(
-                  top: 22,
-                  left: 22,
-                  child: _MapBadge(
-                    icon: Icons.directions_bus,
-                    label: trip.busNumber,
-                  ),
-                ),
-                Positioned(
-                  bottom: 22,
-                  right: 22,
-                  child: Container(
-                    height: 58,
-                    width: 58,
-                    decoration: BoxDecoration(
-                      color: ParentUiColors.orange,
-                      borderRadius: BorderRadius.circular(18),
-                      boxShadow: [
-                        BoxShadow(
-                          color: ParentUiColors.orange.withValues(alpha: 0.35),
-                          blurRadius: 18,
-                          offset: const Offset(0, 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(24),
+            child: SizedBox(
+              height: 260,
+              width: double.infinity,
+              child: hasLocation
+                  ? FlutterMap(
+                      options: MapOptions(initialCenter: busPoint, initialZoom: 14),
+                      children: [
+                        TileLayer(
+                          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                          userAgentPackageName: 'com.saferide.app',
+                        ),
+                        MarkerLayer(
+                          markers: [
+                            Marker(
+                              point: busPoint,
+                              width: 44,
+                              height: 44,
+                              child: const Icon(
+                                Icons.directions_bus_filled,
+                                color: ParentUiColors.orange,
+                                size: 34,
+                              ),
+                            ),
+                          ],
                         ),
                       ],
+                    )
+                  : Container(
+                      color: ParentUiColors.orange.withValues(alpha: 0.08),
+                      alignment: Alignment.center,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.gps_not_fixed, size: 42, color: ParentUiColors.orange),
+                          const SizedBox(height: 8),
+                          Text(
+                            trip.status == ParentTripStatus.notStarted
+                                ? 'Trip has not started yet'
+                                : 'Waiting for GPS signal…',
+                            style: TextStyle(color: Colors.grey.shade700, fontWeight: FontWeight.w700),
+                          ),
+                        ],
+                      ),
                     ),
-                    child: const Icon(
-                      Icons.directions_bus_filled,
-                      color: Colors.white,
-                      size: 30,
-                    ),
-                  ),
-                ),
-              ],
             ),
           ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: _LocationInfoTile(
-                  title: 'Latitude',
-                  value: trip.busLatitude.toStringAsFixed(4),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _LocationInfoTile(
-                  title: 'Longitude',
-                  value: trip.busLongitude.toStringAsFixed(4),
-                ),
-              ),
-            ],
-          ),
         ],
-      ),
-    );
-  }
-}
-
-class _DemoTripActions extends ConsumerWidget {
-  const _DemoTripActions();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return _SectionCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _DemoActionButton(
-            icon: Icons.cloud_upload_outlined,
-            label: 'Seed Trip',
-            isFilled: true,
-            onPressed: () {
-              _runTripAction(
-                context,
-                ref,
-                actionType: ParentTripActionType.boarded,
-                successMessage: 'Trip seeded and boarded notification created.',
-              );
-            },
-          ),
-          const SizedBox(height: 10),
-          _DemoActionButton(
-            icon: Icons.directions_bus_outlined,
-            label: 'Move Bus',
-            onPressed: () {
-              _runTripAction(
-                context,
-                ref,
-                actionType: ParentTripActionType.moved,
-                successMessage: 'Bus moved and notification created.',
-              );
-            },
-          ),
-          const SizedBox(height: 10),
-          _DemoActionButton(
-            icon: Icons.warning_amber_outlined,
-            label: 'Delay',
-            onPressed: () {
-              _runTripAction(
-                context,
-                ref,
-                actionType: ParentTripActionType.delayed,
-                successMessage: 'Delay notification created.',
-              );
-            },
-          ),
-          const SizedBox(height: 10),
-          _DemoActionButton(
-            icon: Icons.check_circle_outline,
-            label: 'Complete',
-            onPressed: () {
-              _runTripAction(
-                context,
-                ref,
-                actionType: ParentTripActionType.completed,
-                successMessage: 'Arrival notification created.',
-              );
-            },
-          ),
-          const SizedBox(height: 10),
-          _DemoActionButton(
-            icon: Icons.emergency_outlined,
-            label: 'Emergency Alert',
-            isDanger: true,
-            onPressed: () {
-              _runTripAction(
-                context,
-                ref,
-                actionType: ParentTripActionType.emergency,
-                successMessage: 'Emergency notification created.',
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _runTripAction(
-    BuildContext context,
-    WidgetRef ref, {
-    required ParentTripActionType actionType,
-    required String successMessage,
-  }) async {
-    await ref
-        .read(parentTripNotificationActionsProvider)
-        .runTripAction(actionType);
-
-    if (!context.mounted) return;
-
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(successMessage)));
-  }
-}
-
-class _DemoActionButton extends StatelessWidget {
-  const _DemoActionButton({
-    required this.icon,
-    required this.label,
-    required this.onPressed,
-    this.isFilled = false,
-    this.isDanger = false,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onPressed;
-  final bool isFilled;
-  final bool isDanger;
-
-  @override
-  Widget build(BuildContext context) {
-    if (isFilled) {
-      return SizedBox(
-        height: 46,
-        child: ElevatedButton.icon(
-          onPressed: onPressed,
-          icon: Icon(icon),
-          label: Text(label),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: ParentUiColors.orange,
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-            ),
-          ),
-        ),
-      );
-    }
-
-    return SizedBox(
-      height: 46,
-      child: OutlinedButton.icon(
-        onPressed: onPressed,
-        icon: Icon(icon),
-        label: Text(label),
-        style: OutlinedButton.styleFrom(
-          foregroundColor: isDanger ? Colors.red : ParentUiColors.orange,
-          side: BorderSide(
-            color: isDanger ? Colors.red : ParentUiColors.orange,
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-          ),
-        ),
       ),
     );
   }
@@ -569,37 +366,6 @@ class _RouteStopRow extends StatelessWidget {
   }
 }
 
-class _LocationInfoTile extends StatelessWidget {
-  const _LocationInfoTile({required this.title, required this.value});
-
-  final String title;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Column(
-        children: [
-          Text(
-            title,
-            style: TextStyle(
-              color: Colors.grey.shade600,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.w900)),
-        ],
-      ),
-    );
-  }
-}
-
 class _TripInfoRow extends StatelessWidget {
   const _TripInfoRow({
     required this.icon,
@@ -631,32 +397,6 @@ class _TripInfoRow extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _MapBadge extends StatelessWidget {
-  const _MapBadge({required this.icon, required this.label});
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: ParentUiColors.orange, size: 18),
-          const SizedBox(width: 6),
-          Text(label, style: const TextStyle(fontWeight: FontWeight.w800)),
-        ],
-      ),
     );
   }
 }

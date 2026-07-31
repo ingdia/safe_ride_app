@@ -56,6 +56,19 @@ class TodaysRouteScreen extends ConsumerWidget {
             final stops = loadedState.stops;
             final progress = (loadedState.routeProgress * 100).round();
 
+            if (stops.isEmpty) {
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  child: Text(
+                    'No route assigned yet. Contact your school administrator.',
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSecondary),
+                  ),
+                ),
+              );
+            }
+
             return CustomScrollView(
               slivers: [
                 SliverToBoxAdapter(child: _buildHeader(context)),
@@ -77,6 +90,11 @@ class TodaysRouteScreen extends ConsumerWidget {
                       (context, index) => _RouteStopTile(
                         stop: stops[index],
                         onTap: () => _showStopDetails(context, stops[index]),
+                        isCompleted: loadedState.stopsCompleted.contains(stops[index].name),
+                        canMarkPassed: loadedState.isTripActive,
+                        onMarkPassed: () => ref
+                            .read(driverRouteProvider.notifier)
+                            .markStopCompleted(stops[index].name),
                       ),
                       childCount: stops.length,
                     ),
@@ -100,7 +118,7 @@ class TodaysRouteScreen extends ConsumerWidget {
           ),
         ),
       ),
-      floatingActionButton: _buildStartRouteButton(context),
+      floatingActionButton: _buildStartRouteButton(context, ref),
       floatingActionButtonLocation:
           FloatingActionButtonLocation.centerFloat,
     );
@@ -278,7 +296,11 @@ class TodaysRouteScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildStartRouteButton(BuildContext context) {
+  Widget _buildStartRouteButton(BuildContext context, WidgetRef ref) {
+    final routeState = ref.watch(driverRouteProvider).value;
+    final isTripActive = routeState is DriverRouteLoaded && routeState.isTripActive;
+    final hasRoute = routeState is DriverRouteLoaded && routeState.stops.isNotEmpty;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
       child: Column(
@@ -288,17 +310,30 @@ class TodaysRouteScreen extends ConsumerWidget {
             width: double.infinity,
             height: AppSpacing.tapTargetMin + 8, // >= 48dp Material tap target
             child: ElevatedButton.icon(
-              onPressed: () {
-                // TODO(Task 2): Check GPS status via DriverRouteBloc,
-                // then navigate to the Active Route screen (Fig. 5 flow).
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Starting route…')),
-                );
-              },
-              icon: const Icon(Icons.navigation_rounded),
-              label: const Text('Start Route'),
+              onPressed: !hasRoute
+                  ? null
+                  : () async {
+                      final notifier = ref.read(driverRouteProvider.notifier);
+                      if (isTripActive) {
+                        await notifier.endTrip();
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Trip ended.')),
+                          );
+                        }
+                      } else {
+                        await notifier.startTrip();
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Trip started — sharing live location.')),
+                          );
+                        }
+                      }
+                    },
+              icon: Icon(isTripActive ? Icons.flag_rounded : Icons.navigation_rounded),
+              label: Text(isTripActive ? 'End Trip' : 'Start Route'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
+                backgroundColor: isTripActive ? AppColors.warning : AppColors.primary,
                 foregroundColor: Colors.white,
                 textStyle: AppTextStyles.buttonLabel,
                 shape: RoundedRectangleBorder(
@@ -469,19 +504,30 @@ class _SummaryStat extends StatelessWidget {
 /// `widgets/route_stop_tile.dart` if it ends up reused elsewhere
 /// (e.g. on the Driver Map screen).
 class _RouteStopTile extends StatelessWidget {
-  const _RouteStopTile({required this.stop, required this.onTap});
+  const _RouteStopTile({
+    required this.stop,
+    required this.onTap,
+    required this.isCompleted,
+    required this.canMarkPassed,
+    required this.onMarkPassed,
+  });
 
   final RouteStop stop;
   final VoidCallback onTap;
+  final bool isCompleted;
+  final bool canMarkPassed;
+  final VoidCallback onMarkPassed;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.only(bottom: AppSpacing.sm),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: isCompleted ? AppColors.success.withValues(alpha: 0.06) : AppColors.surface,
         borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(
+          color: isCompleted ? AppColors.success.withValues(alpha: 0.4) : AppColors.border,
+        ),
       ),
       clipBehavior: Clip.antiAlias,
       child: Material(
@@ -499,20 +545,24 @@ class _RouteStopTile extends StatelessWidget {
                   height: AppSpacing.tapTargetMin,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: stop.isDestination
-                        ? AppColors.success.withValues(alpha: 0.15)
-                        : AppColors.primary.withValues(alpha: 0.12),
+                    color: isCompleted
+                        ? AppColors.success.withValues(alpha: 0.18)
+                        : stop.isDestination
+                            ? AppColors.success.withValues(alpha: 0.15)
+                            : AppColors.primary.withValues(alpha: 0.12),
                     shape: BoxShape.circle,
                   ),
-                  child: Text(
-                    '${stop.order}',
-                    style: AppTextStyles.bodyMedium.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: stop.isDestination
-                          ? AppColors.success
-                          : AppColors.primary,
-                    ),
-                  ),
+                  child: isCompleted
+                      ? const Icon(Icons.check_rounded, color: AppColors.success)
+                      : Text(
+                          '${stop.order}',
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: stop.isDestination
+                                ? AppColors.success
+                                : AppColors.primary,
+                          ),
+                        ),
                 ),
                 const SizedBox(width: AppSpacing.sm),
                 Expanded(
@@ -522,35 +572,55 @@ class _RouteStopTile extends StatelessWidget {
                       Text(stop.name, style: AppTextStyles.bodyMedium),
                       if (!stop.isDestination)
                         Text(
-                          '${stop.studentCount} student'
-                          '${stop.studentCount == 1 ? '' : 's'}',
+                          isCompleted
+                              ? 'Passed'
+                              : '${stop.studentCount} student'
+                                  '${stop.studentCount == 1 ? '' : 's'}',
                           style: AppTextStyles.bodySmall.copyWith(
-                            color: AppColors.textSecondary,
+                            color: isCompleted ? AppColors.success : AppColors.textSecondary,
+                            fontWeight: isCompleted ? FontWeight.w700 : null,
                           ),
                         )
                       else
                         Text(
-                          'Final destination',
+                          isCompleted ? 'Arrived' : 'Final destination',
                           style: AppTextStyles.bodySmall.copyWith(
-                            color: AppColors.textSecondary,
+                            color: isCompleted ? AppColors.success : AppColors.textSecondary,
+                            fontWeight: isCompleted ? FontWeight.w700 : null,
                           ),
                         ),
                     ],
                   ),
                 ),
-                Text(
-                  stop.time,
-                  style: AppTextStyles.bodySmall.copyWith(
-                    color: AppColors.textSecondary,
-                    fontWeight: FontWeight.w600,
+                if (canMarkPassed && !isCompleted)
+                  SizedBox(
+                    height: 34,
+                    child: OutlinedButton(
+                      onPressed: onMarkPassed,
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        foregroundColor: AppColors.primary,
+                        side: const BorderSide(color: AppColors.primary),
+                        textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                      ),
+                      child: const Text('Mark passed'),
+                    ),
+                  )
+                else ...[
+                  Text(
+                    stop.time,
+                    style: AppTextStyles.bodySmall.copyWith(
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-                const SizedBox(width: AppSpacing.xs),
-                Icon(
-                  Icons.chevron_right_rounded,
-                  color: AppColors.textSecondary,
-                  size: 20,
-                ),
+                  const SizedBox(width: AppSpacing.xs),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: AppColors.textSecondary,
+                    size: 20,
+                  ),
+                ],
               ],
             ),
           ),

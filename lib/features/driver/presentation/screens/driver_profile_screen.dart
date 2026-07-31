@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/routing/auth_routes.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/driver_profile_provider.dart';
 
 class DriverProfileScreen extends ConsumerWidget {
@@ -11,8 +13,23 @@ class DriverProfileScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final profile = ref.watch(driverProfileProvider);
+    final profileAsync = ref.watch(driverProfileProvider);
 
+    return profileAsync.when(
+      loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
+      error: (e, st) => Scaffold(body: Center(child: Text('Unable to load profile: $e'))),
+      data: (profile) => _DriverProfileContent(profile: profile),
+    );
+  }
+}
+
+class _DriverProfileContent extends ConsumerWidget {
+  const _DriverProfileContent({required this.profile});
+
+  final DriverProfile profile;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -100,7 +117,16 @@ class DriverProfileScreen extends ConsumerWidget {
                         SizedBox(
                           height: AppSpacing.tapTargetMin + 8,
                           child: OutlinedButton.icon(
-                            onPressed: () {},
+                            onPressed: () async {
+                              await ref.read(authProvider.notifier).signOut();
+                              if (context.mounted) {
+                                Navigator.pushNamedAndRemoveUntil(
+                                  context,
+                                  AuthRoutes.login,
+                                  (_) => false,
+                                );
+                              }
+                            },
                             icon: const Icon(Icons.logout_rounded),
                             label: const Text('Logout & Switch Role'),
                             style: OutlinedButton.styleFrom(

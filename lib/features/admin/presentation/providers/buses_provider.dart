@@ -1,30 +1,41 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/bus_model.dart';
 import '../../data/repositories/buses_repository.dart';
+import 'admin_session_provider.dart';
 
 final busesRepositoryProvider = Provider<BusesRepository>((ref) {
   return BusesRepository();
 });
 
 class BusesController extends Notifier<List<BusModel>> {
+  StreamSubscription<List<BusModel>>? _subscription;
+
   @override
   List<BusModel> build() {
-    return ref.watch(busesRepositoryProvider).getAll();
+    final schoolId = ref.watch(adminSchoolIdProvider);
+    final repository = ref.watch(busesRepositoryProvider);
+
+    _subscription?.cancel();
+    _subscription = repository.watch(schoolId).listen((buses) {
+      state = buses;
+    });
+    ref.onDispose(() => _subscription?.cancel());
+
+    return const [];
   }
 
-  void addBus(BusModel bus) {
-    ref.read(busesRepositoryProvider).add(bus);
-    state = ref.read(busesRepositoryProvider).getAll();
+  Future<void> addBus(BusModel bus) {
+    return ref.read(busesRepositoryProvider).add(bus);
   }
 
-  void updateBus(BusModel bus) {
-    ref.read(busesRepositoryProvider).update(bus);
-    state = ref.read(busesRepositoryProvider).getAll();
+  Future<void> updateBus(BusModel bus) {
+    return ref.read(busesRepositoryProvider).update(bus);
   }
 
-  void deleteBus(String busId) {
-    ref.read(busesRepositoryProvider).delete(busId);
-    state = ref.read(busesRepositoryProvider).getAll();
+  Future<void> deleteBus(String busId) {
+    return ref.read(busesRepositoryProvider).delete(busId);
   }
 }
 

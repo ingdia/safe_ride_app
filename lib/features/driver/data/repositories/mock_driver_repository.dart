@@ -96,6 +96,7 @@ class MockDriverRepository implements DriverRepository {
     AttendanceStatus status, {
     String? routeId,
     String? busId,
+    String? tripId,
   }) async {
     final index = _students.indexWhere((student) => student.id == studentId);
     if (index == -1) {
@@ -118,4 +119,21 @@ class MockDriverRepository implements DriverRepository {
     // supported for testing and provider flow.
     return;
   }
+
+  @override
+  Future<String?> findActiveTripId({required String busId}) async => null;
+
+  @override
+  Future<String> startTrip({required String busId, required String routeId}) async {
+    return 'mock-trip-${DateTime.now().millisecondsSinceEpoch}';
+  }
+
+  @override
+  Future<void> endTrip(String tripId) async {}
+
+  @override
+  Future<void> markStopCompleted({required String tripId, required String stopName}) async {}
+
+  @override
+  Future<List<String>> fetchStopsCompleted(String tripId) async => const [];
 }

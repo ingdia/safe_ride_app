@@ -1,9 +1,13 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/firebase/firebase_collections.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../shared/models/trip_entity.dart';
 import '../../data/models/driver_alert.dart';
 import '../../domain/models/route_stop.dart';
 import '../../domain/models/student.dart';
@@ -11,6 +15,34 @@ import '../providers/driver_navigation_provider.dart';
 import '../providers/driver_profile_provider.dart';
 import '../providers/driver_route_provider.dart';
 import '../providers/driver_route_state.dart';
+
+/// The driver's own completed trips — most recent first. Resolves their
+/// busId from their own user doc rather than threading it through
+/// driverRouteProvider's state, since this is only needed on demand.
+final _recentTripsProvider = FutureProvider.autoDispose<List<TripEntity>>((ref) async {
+  final uid = FirebaseAuth.instance.currentUser?.uid;
+  if (uid == null) return const [];
+
+  final firestore = FirebaseFirestore.instance;
+  final userDoc = await firestore.collection(FirebaseCollections.users).doc(uid).get();
+  final busId = userDoc.data()?['busId'] as String?;
+  if (busId == null || busId.isEmpty) return const [];
+
+  // Sorted client-side rather than via orderBy() — multiple equality (==)
+  // filters alone don't need a composite index in Firestore, but adding
+  // orderBy on a different field would, and that index isn't guaranteed to
+  // exist/deployed.
+  final tripsQuery = await firestore
+      .collection(FirebaseCollections.trips)
+      .where('busId', isEqualTo: busId)
+      .where('status', isEqualTo: 'completed')
+      .limit(30)
+      .get();
+
+  final trips = tripsQuery.docs.map(TripEntity.fromDoc).toList()
+    ..sort((a, b) => (b.completedAt ?? DateTime(0)).compareTo(a.completedAt ?? DateTime(0)));
+  return trips.take(10).toList();
+});
 
 /// Tracks the set of alert IDs already shown to the driver this session.
 ///
@@ -43,7 +75,18 @@ class _DriverDashboardScreenState
   @override
   Widget build(BuildContext context) {
     final routeState = ref.watch(driverRouteProvider);
-    final profile = ref.watch(driverProfileProvider);
+    final profile = ref.watch(driverProfileProvider).maybeWhen(
+          data: (v) => v,
+          orElse: () => const DriverProfile(
+            name: 'Driver',
+            role: 'Driver',
+            email: '',
+            phone: '',
+            busNumber: '—',
+            route: 'Loading…',
+            license: '',
+          ),
+        );
 
     // Resolve routeId from loaded state — empty string when on mock data.
     final routeId = routeState.maybeWhen(
@@ -89,6 +132,11 @@ class _DriverDashboardScreenState
             }
 
             final loaded = state;
+
+            if (loaded.stops.isEmpty) {
+              return _NoRouteYetState(profile: profile);
+            }
+
             final studentCount = loaded.students.length;
             final stopCount = loaded.stops.length;
             final completedStops = loaded.stops.where((stop) => stop.status == RouteStopStatus.completed).length;
@@ -117,7 +165,7 @@ class _DriverDashboardScreenState
                     children: [
                       Row(
                         children: [
-                          Expanded(child: _MetricPill(label: 'Bus', value: '12')),
+                          Expanded(child: _MetricPill(label: 'Bus', value: profile.busNumber)),
                           const SizedBox(width: AppSpacing.sm),
                           Expanded(child: _MetricPill(label: 'Boarded', value: '$boardedCount')),
                         ],
@@ -293,15 +341,54 @@ class _DriverDashboardScreenState
               children: [
                 Text('Trip history', style: AppTextStyles.headingSmall),
                 const SizedBox(height: AppSpacing.sm),
-                _HistoryLogTile(title: 'North Loop Route', subtitle: 'Mon 07:30 • On time • 4/5 marked'),
-                _HistoryLogTile(title: 'Central School Circle', subtitle: 'Fri 07:25 • Delayed 4 min • 3/4 marked'),
-                _HistoryLogTile(title: 'New Market Route', subtitle: 'Thu 07:35 • On time • 5/5 marked'),
+                Consumer(
+                  builder: (context, ref, _) {
+                    final tripsAsync = ref.watch(_recentTripsProvider);
+                    return tripsAsync.when(
+                      loading: () => const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 24),
+                        child: Center(child: CircularProgressIndicator()),
+                      ),
+                      error: (e, st) => Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        child: Text('Unable to load trip history.', style: AppTextStyles.bodyMedium),
+                      ),
+                      data: (trips) {
+                        if (trips.isEmpty) {
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            child: Text('No completed trips yet.', style: AppTextStyles.bodyMedium),
+                          );
+                        }
+                        return Column(
+                          children: [
+                            for (final trip in trips)
+                              _HistoryLogTile(
+                                title: trip.type == TripType.morning ? 'Morning trip' : 'Afternoon trip',
+                                subtitle:
+                                    '${_formatDate(trip.completedAt)} • ${trip.studentEvents.length} student events',
+                              ),
+                          ],
+                        );
+                      },
+                    );
+                  },
+                ),
               ],
             ),
           ),
         );
       },
     );
+  }
+
+  String _formatDate(DateTime? date) {
+    if (date == null) return 'Unknown date';
+    const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    final weekday = weekdays[date.weekday - 1];
+    final hour = date.hour.toString().padLeft(2, '0');
+    final minute = date.minute.toString().padLeft(2, '0');
+    return '$weekday $hour:$minute';
   }
 }
 
@@ -332,6 +419,42 @@ String _todayLabel() {
   ];
 
   return '${weekdays[now.weekday - 1]}, ${months[now.month - 1]} ${now.day}';
+}
+
+class _NoRouteYetState extends StatelessWidget {
+  const _NoRouteYetState({required this.profile});
+
+  final DriverProfile profile;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.route_outlined, size: 56, color: AppColors.textSecondary),
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              profile.busNumber == 'Unassigned'
+                  ? 'No bus assigned yet'
+                  : 'No route set up for ${profile.busNumber} yet',
+              style: AppTextStyles.headingSmall,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              'Your school administrator needs to create a route with stops '
+              'for your bus before you can start a trip.',
+              style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSecondary),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _HeaderCard extends StatelessWidget {

@@ -1,9 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:hive/hive.dart';
 
+import '../../../../core/firebase/firebase_collections.dart';
 import '../../../../core/storage/hive_boxes.dart';
-import '../datasources/driver_firestore_fields.dart';
-import '../datasources/driver_firestore_paths.dart';
 import '../models/cached_attendance_record.dart';
 import '../../domain/models/student.dart';
 
@@ -48,10 +47,13 @@ class AttendanceCacheService {
 
   /// Pushes all unsynced cached records to Firestore one record at a time.
   ///
-  /// Each record produces two sequential writes:
-  /// 1. A new document in `routes/{routeId}/attendance/{auto-id}` (falls back
-  ///    to the top-level `attendance` collection when [routeId] is empty).
-  /// 2. A `status` field update on `students/{studentId}`.
+  /// Each record produces up to two writes:
+  /// 1. If an in-progress trip can be resolved for the record's route (via
+  ///    the route's `busId`), the matching `trips/{tripId}.studentEvents`
+  ///    entry is set — this is what the parent app is watching.
+  /// 2. `students/{studentId}.attendanceStatus` is updated (a distinct field
+  ///    from `status`, which holds the school-approval state and must never
+  ///    be overwritten by an attendance mark).
   ///
   /// Records are written individually so a failure on one (e.g. a network drop
   /// mid-sync) does not prevent the others from being committed. Only records
@@ -68,32 +70,37 @@ class AttendanceCacheService {
     if (unsynced.isEmpty) return;
 
     for (final record in unsynced) {
-      final statusValue = record.statusIndex == AttendanceStatus.boarded.index
-          ? DriverFirestoreFields.boarded
-          : DriverFirestoreFields.alighted;
+      final statusValue =
+          record.statusIndex == AttendanceStatus.boarded.index ? 'boarded' : 'alighted';
 
       try {
-        final attendanceCollection = record.routeId.isNotEmpty
-            ? fs.collection(DriverFirestorePaths.routeAttendanceCollection(record.routeId))
-            : fs.collection(DriverFirestorePaths.attendance);
-        final attendanceRef = attendanceCollection.doc();
-
-        await attendanceRef.set({
-          DriverFirestoreFields.attendanceId: attendanceRef.id,
-          DriverFirestoreFields.studentId: record.studentId,
-          DriverFirestoreFields.routeId: record.routeId,
-          DriverFirestoreFields.status: statusValue,
-          DriverFirestoreFields.date: record.recordedAt.toIso8601String(),
-          DriverFirestoreFields.timestamp: FieldValue.serverTimestamp(),
-          DriverFirestoreFields.recordedBy: 'driver_app',
-        });
+        if (record.routeId.isNotEmpty) {
+          final routeDoc =
+              await fs.collection(FirebaseCollections.routes).doc(record.routeId).get();
+          final busId = routeDoc.data()?['busId'] as String?;
+          if (busId != null && busId.isNotEmpty) {
+            final tripQuery = await fs
+                .collection(FirebaseCollections.trips)
+                .where('busId', isEqualTo: busId)
+                .where('status', isEqualTo: 'inProgress')
+                .limit(1)
+                .get();
+            if (tripQuery.docs.isNotEmpty) {
+              await tripQuery.docs.first.reference.update({
+                'studentEvents.${record.studentId}':
+                    statusValue == 'boarded' ? 'boarded' : 'droppedOff',
+              });
+            }
+          }
+        }
 
         await fs
-            .collection('students')
+            .collection(FirebaseCollections.students)
             .doc(record.studentId)
-            .update({DriverFirestoreFields.status: statusValue});
+            .set({'attendanceStatus': statusValue}, SetOptions(merge: true));
 
-        // Both writes succeeded — safe to remove from cache.
+        // Both writes succeeded (or there was no active trip to update) —
+        // safe to remove from cache.
         await box.delete(record.studentId);
       } catch (_) {
         // This record failed; leave it in the cache for the next retry.

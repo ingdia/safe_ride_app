@@ -1,75 +1,55 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../data/models/user_model.dart';
+import '../../data/repositories/drivers_repository.dart';
+import 'admin_session_provider.dart';
 
-final List<UserModel> _seedUsers = [
-  UserModel(
-    userId: 'user-admin-1',
-    name: 'Michael Chen',
-    email: 'michael.chen@schoolbus.com',
-    phone: '(555) 456-7890',
-    role: UserRole.admin,
-    createdAt: DateTime(2024, 1, 10),
-  ),
-  UserModel(
-    userId: 'user-driver-12',
-    name: 'John Smith',
-    email: 'john.smith@schoolbus.com',
-    phone: '(555) 111-2222',
-    role: UserRole.driver,
-    createdAt: DateTime(2024, 2, 3),
-  ),
-  UserModel(
-    userId: 'user-driver-07',
-    name: 'Sarah Johnson',
-    email: 'sarah.johnson@schoolbus.com',
-    phone: '(555) 222-3333',
-    role: UserRole.driver,
-    createdAt: DateTime(2024, 2, 10),
-  ),
-  UserModel(
-    userId: 'user-driver-15',
-    name: 'Mike Davis',
-    email: 'mike.davis@schoolbus.com',
-    phone: '(555) 333-4444',
-    role: UserRole.driver,
-    createdAt: DateTime(2024, 3, 1),
-  ),
-  UserModel(
-    userId: 'user-driver-03',
-    name: 'Emily Brown',
-    email: 'emily.brown@schoolbus.com',
-    phone: '(555) 444-5555',
-    role: UserRole.driver,
-    createdAt: DateTime(2024, 3, 15),
-  ),
-  UserModel(
-    userId: 'user-parent-1',
-    name: 'Laura Martinez',
-    email: 'laura.martinez@example.com',
-    phone: '(555) 555-1010',
-    role: UserRole.parent,
-    createdAt: DateTime(2024, 1, 20),
-  ),
-  UserModel(
-    userId: 'user-parent-2',
-    name: 'David Kim',
-    email: 'david.kim@example.com',
-    phone: '(555) 555-2020',
-    role: UserRole.parent,
-    createdAt: DateTime(2024, 1, 22),
-  ),
-  UserModel(
-    userId: 'user-parent-3',
-    name: 'Priya Patel',
-    email: 'priya.patel@example.com',
-    phone: '(555) 555-3030',
-    role: UserRole.parent,
-    createdAt: DateTime(2024, 2, 1),
-  ),
-];
-
-final usersProvider = Provider<List<UserModel>>((ref) => _seedUsers);
-
-final currentAdminProvider = Provider<UserModel>((ref) {
-  return ref.watch(usersProvider).firstWhere((u) => u.role == UserRole.admin);
+final driversRepositoryProvider = Provider<DriversRepository>((ref) {
+  return DriversRepository();
 });
+
+class DriversController extends Notifier<List<UserModel>> {
+  StreamSubscription<List<UserModel>>? _subscription;
+
+  @override
+  List<UserModel> build() {
+    final schoolId = ref.watch(adminSchoolIdProvider);
+    final repository = ref.watch(driversRepositoryProvider);
+
+    _subscription?.cancel();
+    _subscription = repository.watchDrivers(schoolId).listen((drivers) {
+      state = drivers;
+    });
+    ref.onDispose(() => _subscription?.cancel());
+
+    return const [];
+  }
+
+  /// Returns the temporary password the admin should share with the driver
+  /// (there's no email-delivery mechanism available on the Spark plan).
+  Future<void> createDriver({
+    required String name,
+    required String email,
+    required String password,
+    required String phone,
+  }) {
+    final schoolId = ref.read(adminSchoolIdProvider);
+    return ref.read(driversRepositoryProvider).createDriver(
+          name: name,
+          email: email,
+          password: password,
+          phone: phone,
+          schoolId: schoolId,
+        );
+  }
+
+  Future<void> assignBus({required String driverUid, required String? busId}) {
+    return ref.read(driversRepositoryProvider).assignBus(driverUid: driverUid, busId: busId);
+  }
+}
+
+final driversProvider = NotifierProvider<DriversController, List<UserModel>>(
+  DriversController.new,
+);

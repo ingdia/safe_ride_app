@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 enum UserRole { parent, driver, admin }
 
 extension UserRoleX on UserRole {
@@ -19,6 +21,10 @@ class UserModel {
   final String email;
   final String phone;
   final UserRole role;
+  final String? schoolId;
+
+  /// Only meaningful for drivers — presence unlocks driver login.
+  final String? busId;
   final DateTime createdAt;
 
   const UserModel({
@@ -28,5 +34,25 @@ class UserModel {
     required this.phone,
     required this.role,
     required this.createdAt,
+    this.schoolId,
+    this.busId,
   });
+
+  factory UserModel.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
+    final d = doc.data() ?? {};
+    final roleName = d['role'] as String? ?? 'parent';
+    return UserModel(
+      userId: doc.id,
+      name: d['name'] as String? ?? '',
+      email: d['email'] as String? ?? '',
+      phone: d['phone'] as String? ?? '',
+      role: UserRole.values.firstWhere(
+        (r) => r.value == roleName,
+        orElse: () => UserRole.parent,
+      ),
+      schoolId: d['schoolId'] as String?,
+      busId: d['busId'] as String?,
+      createdAt: (d['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+    );
+  }
 }

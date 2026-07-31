@@ -5,6 +5,7 @@ import '../../../../core/routing/app_router.dart';
 import '../../../../core/routing/auth_routes.dart';
 import '../../../../core/utils/validators.dart';
 import '../../../../features/parent/presentation/widgets/parent_ui_constants.dart';
+import '../../domain/entities/auth_user.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/auth_primary_button.dart';
 import '../widgets/auth_text_field.dart';
@@ -36,13 +37,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         );
   }
 
+  Future<void> _onGoogleSignIn() async {
+    await ref.read(authProvider.notifier).loginWithGoogle();
+  }
+
   @override
   Widget build(BuildContext context) {
     ref.listen<AuthState>(authProvider, (_, state) {
       if (state is AuthAuthenticated) {
         Navigator.pushNamedAndRemoveUntil(
           context,
-          AppRouter.dashboardForRole(state.user.role),
+          AppRouter.dashboardForUser(state.user),
           (_) => false,
         );
       } else if (state is AuthError) {
@@ -54,6 +59,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         );
         ref.read(authProvider.notifier).clearError();
       }
+    });
+
+    ref.listen<AsyncValue<AuthUser?>>(authUserProvider, (_, state) {
+      state.whenData((user) {
+        if (user != null) {
+          Navigator.pushNamedAndRemoveUntil(
+            context,
+            AppRouter.dashboardForUser(user),
+            (_) => false,
+          );
+        }
+      });
     });
 
     final isLoading = ref.watch(authProvider) is AuthLoading;
@@ -74,6 +91,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 emailController: _emailController,
                 passwordController: _passwordController,
                 onLogin: _onLogin,
+                onGoogleSignIn: _onGoogleSignIn,
                 isLoading: isLoading,
               ),
               const SizedBox(height: ParentUiSpacing.lg),
@@ -143,6 +161,7 @@ class _LoginCard extends StatelessWidget {
     required this.emailController,
     required this.passwordController,
     required this.onLogin,
+    required this.onGoogleSignIn,
     required this.isLoading,
   });
 
@@ -150,6 +169,7 @@ class _LoginCard extends StatelessWidget {
   final TextEditingController emailController;
   final TextEditingController passwordController;
   final VoidCallback onLogin;
+  final VoidCallback onGoogleSignIn;
   final bool isLoading;
 
   @override
@@ -203,6 +223,32 @@ class _LoginCard extends StatelessWidget {
               label: 'Sign in',
               onPressed: onLogin,
               isLoading: isLoading,
+            ),
+            const SizedBox(height: ParentUiSpacing.md),
+            SizedBox(
+              width: double.infinity,
+              height: 54,
+              child: OutlinedButton.icon(
+                onPressed: isLoading ? null : onGoogleSignIn,
+                icon: const Icon(
+                  Icons.login,
+                  color: ParentUiColors.orange,
+                ),
+                label: Text(
+                  'Continue with Google',
+                  style: ParentUiTextStyles.body.copyWith(
+                    color: ParentUiColors.orange,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: ParentUiColors.orange),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(ParentUiRadius.md),
+                  ),
+                  backgroundColor: Colors.white,
+                ),
+              ),
             ),
           ],
         ),
