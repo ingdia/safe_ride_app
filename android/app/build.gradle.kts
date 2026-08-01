@@ -10,7 +10,15 @@ plugins {
 android {
     namespace = "com.example.safe_ride_app"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    // Pinned explicitly instead of the dynamic `flutter.ndkVersion` — on at
+    // least one team machine that provider fails to resolve a value at all,
+    // which breaks path_provider_android's jni Gradle module downstream
+    // (":jni:compileDebugJavaWithJavac" — "Cannot query the value of this
+    // provider because it has no value available"), even with the NDK
+    // physically installed. If Gradle reports this version isn't installed,
+    // install it via Android Studio's SDK Manager > SDK Tools > NDK (side by
+    // side), or change this to whatever version you have installed.
+    ndkVersion = "28.2.13676358"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

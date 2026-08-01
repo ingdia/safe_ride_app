@@ -27,7 +27,7 @@ plugins {
     // NDK+JDK17 setup. Pinned to a mature, widely-tested AGP/Gradle/Kotlin
     // combination instead — see gradle-wrapper.properties for the paired
     // Gradle version.
-    id("com.android.application") version "8.7.3" apply false
+    id("com.android.application") version "8.11.1" apply false
     // START: FlutterFire Configuration
     id("com.google.gms.google-services") version("4.4.4") apply false
     // END: FlutterFire Configuration
