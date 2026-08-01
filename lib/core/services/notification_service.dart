@@ -36,12 +36,17 @@ class NotificationService {
       ),
     );
 
-    await _plugin.initialize(settings);
+    await _plugin.initialize(settings: settings);
   }
 
   Future<void> _show(String title, String body) async {
     if (kIsWeb) return;
-    await _plugin.show(_nextId++, title, body, _details);
+    await _plugin.show(
+      id: _nextId++,
+      title: title,
+      body: body,
+      notificationDetails: _details,
+    );
   }
 
   Future<void> showWelcomeNotification({

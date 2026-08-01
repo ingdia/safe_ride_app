@@ -10,19 +10,24 @@ plugins {
 android {
     namespace = "com.example.safe_ride_app"
     compileSdk = flutter.compileSdkVersion
-    // Pinned explicitly instead of the dynamic `flutter.ndkVersion` — on at
-    // least one team machine that provider fails to resolve a value at all,
-    // which breaks path_provider_android's jni Gradle module downstream
-    // (":jni:compileDebugJavaWithJavac" — "Cannot query the value of this
-    // provider because it has no value available"), even with the NDK
-    // physically installed. If Gradle reports this version isn't installed,
-    // install it via Android Studio's SDK Manager > SDK Tools > NDK (side by
-    // side), or change this to whatever version you have installed.
+    // Pinned explicitly instead of the dynamic `flutter.ndkVersion`. Not
+    // strictly required — the ":jni:compileDebugJavaWithJavac" / "Cannot
+    // query the value of this provider" failure some machines hit turned out
+    // to be caused by the Gradle distribution itself never finishing its
+    // download (services.gradle.org redirects to a github.com release asset,
+    // which some networks silently reset connections to), not NDK
+    // resolution. Left pinned anyway since it's a harmless, deterministic
+    // value. If Gradle reports this version isn't installed, install it via
+    // Android Studio's SDK Manager > SDK Tools > NDK (side by side), or
+    // change this to whatever version you have installed.
     ndkVersion = "28.2.13676358"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // flutter_local_notifications requires this — it uses java.time APIs
+        // that need desugaring to run on older Android API levels.
+        isCoreLibraryDesugaringEnabled = true
     }
 
     defaultConfig {
@@ -49,6 +54,10 @@ kotlin {
     compilerOptions {
         jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
     }
+}
+
+dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }
 
 flutter {
