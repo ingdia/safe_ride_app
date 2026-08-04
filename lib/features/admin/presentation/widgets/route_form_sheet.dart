@@ -33,6 +33,8 @@ class _RouteFormSheetState extends ConsumerState<RouteFormSheet> {
   late final TextEditingController _nameController;
   String? _selectedBusId;
   late List<TextEditingController> _stopControllers;
+  late List<TextEditingController> _latControllers;
+  late List<TextEditingController> _lngControllers;
 
   @override
   void initState() {
@@ -47,6 +49,16 @@ class _RouteFormSheetState extends ConsumerState<RouteFormSheet> {
         : existingStops
               .map((s) => TextEditingController(text: s.name))
               .toList();
+    _latControllers = existingStops.isEmpty
+        ? [TextEditingController()]
+        : existingStops
+              .map((s) => TextEditingController(text: s.lat.toString()))
+              .toList();
+    _lngControllers = existingStops.isEmpty
+        ? [TextEditingController()]
+        : existingStops
+              .map((s) => TextEditingController(text: s.lng.toString()))
+              .toList();
   }
 
   @override
@@ -55,17 +67,28 @@ class _RouteFormSheetState extends ConsumerState<RouteFormSheet> {
     for (final controller in _stopControllers) {
       controller.dispose();
     }
+    for (final controller in _latControllers) {
+      controller.dispose();
+    }
+    for (final controller in _lngControllers) {
+      controller.dispose();
+    }
     super.dispose();
   }
 
   void _addStopField() {
-    setState(() => _stopControllers.add(TextEditingController()));
+    setState(() {
+      _stopControllers.add(TextEditingController());
+      _latControllers.add(TextEditingController());
+      _lngControllers.add(TextEditingController());
+    });
   }
 
   void _removeStopField(int index) {
     setState(() {
-      final removed = _stopControllers.removeAt(index);
-      removed.dispose();
+      _stopControllers.removeAt(index).dispose();
+      _latControllers.removeAt(index).dispose();
+      _lngControllers.removeAt(index).dispose();
     });
   }
 
@@ -167,31 +190,75 @@ class _RouteFormSheetState extends ConsumerState<RouteFormSheet> {
                   ),
                   for (var i = 0; i < _stopControllers.length; i++)
                     Padding(
-                      padding: const EdgeInsets.only(bottom: AdminUiSpacing.sm),
-                      child: Row(
+                      padding: const EdgeInsets.only(bottom: AdminUiSpacing.md),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(
-                            child: TextFormField(
-                              controller: _stopControllers[i],
-                              decoration: InputDecoration(
-                                labelText: 'Stop ${i + 1} Name',
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextFormField(
+                                  controller: _stopControllers[i],
+                                  decoration: InputDecoration(
+                                    labelText: 'Stop ${i + 1} Name',
+                                  ),
+                                  validator: (v) => (v == null || v.trim().isEmpty)
+                                      ? 'Required'
+                                      : null,
+                                ),
                               ),
-                              validator: (v) => (v == null || v.trim().isEmpty)
-                                  ? 'Required'
-                                  : null,
-                            ),
+                              if (_stopControllers.length > 1)
+                                IconButton(
+                                  onPressed: () => _removeStopField(i),
+                                  icon: const Icon(
+                                    Icons.close,
+                                    color: AdminUiColors.delayedFg,
+                                  ),
+                                ),
+                            ],
                           ),
-                          if (_stopControllers.length > 1)
-                            IconButton(
-                              onPressed: () => _removeStopField(i),
-                              icon: const Icon(
-                                Icons.close,
-                                color: AdminUiColors.delayedFg,
+                          const SizedBox(height: AdminUiSpacing.xs),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextFormField(
+                                  controller: _latControllers[i],
+                                  keyboardType: const TextInputType.numberWithOptions(
+                                    decimal: true,
+                                    signed: true,
+                                  ),
+                                  decoration: const InputDecoration(
+                                    labelText: 'Latitude',
+                                    hintText: 'e.g. -1.9536',
+                                  ),
+                                  validator: (v) => _validateCoordinate(v, -90, 90),
+                                ),
                               ),
-                            ),
+                              const SizedBox(width: AdminUiSpacing.sm),
+                              Expanded(
+                                child: TextFormField(
+                                  controller: _lngControllers[i],
+                                  keyboardType: const TextInputType.numberWithOptions(
+                                    decimal: true,
+                                    signed: true,
+                                  ),
+                                  decoration: const InputDecoration(
+                                    labelText: 'Longitude',
+                                    hintText: 'e.g. 30.0605',
+                                  ),
+                                  validator: (v) => _validateCoordinate(v, -180, 180),
+                                ),
+                              ),
+                            ],
+                          ),
                         ],
                       ),
                     ),
+                  Text(
+                    'Tip: open the stop location in Google Maps or OpenStreetMap, '
+                    'long-press the pin, and copy the coordinates shown.',
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  ),
                   const SizedBox(height: AdminUiSpacing.md),
                   SizedBox(
                     width: double.infinity,
@@ -209,14 +276,22 @@ class _RouteFormSheetState extends ConsumerState<RouteFormSheet> {
     );
   }
 
+  String? _validateCoordinate(String? v, double min, double max) {
+    if (v == null || v.trim().isEmpty) return 'Required';
+    final parsed = double.tryParse(v.trim());
+    if (parsed == null) return 'Enter a number';
+    if (parsed < min || parsed > max) return 'Must be between $min and $max';
+    return null;
+  }
+
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
     final stops = <RouteStop>[
       for (var i = 0; i < _stopControllers.length; i++)
         RouteStop(
           name: _stopControllers[i].text.trim(),
-          lat: 40.0701 + (i * 0.0001),
-          lng: -73.0901 - (i * 0.0001),
+          lat: double.parse(_latControllers[i].text.trim()),
+          lng: double.parse(_lngControllers[i].text.trim()),
           order: i + 1,
         ),
     ];

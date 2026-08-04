@@ -88,6 +88,14 @@ class _OnboardingNotifier extends Notifier<_OnboardingState> {
         'phone': phone.trim(),
         'schoolId': schoolId,
         'onboardingComplete': true,
+        // Defensive: the students-create rule requires role == 'parent' on
+        // this doc. It's normally set at registration, but if that write
+        // was ever silently rejected (e.g. by the stale-rules bug fixed
+        // earlier), this doc could be missing it — which then makes every
+        // subsequent onboarding submit fail with permission-denied even
+        // though the user is genuinely signed in. Re-asserting it here is a
+        // no-op when it's already correct.
+        'role': 'parent',
       }, SetOptions(merge: true));
 
       for (final child in children) {
@@ -98,6 +106,11 @@ class _OnboardingNotifier extends Notifier<_OnboardingState> {
           'parentId': uid,
           'status': 'pending',
           'requestedStop': child.requestedStop.trim(),
+          // Denormalized so the driver can see who to contact — drivers
+          // have no read access to other users' profiles under the
+          // security rules, only to their own bus's student docs.
+          'parentName': parentName.trim(),
+          'parentPhone': phone.trim(),
           'createdAt': FieldValue.serverTimestamp(),
         });
       }

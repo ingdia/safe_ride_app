@@ -69,6 +69,13 @@ class FirestoreParentRepository implements ParentRepository {
     required String schoolId,
     required String requestedStop,
   }) async {
+    // Denormalized onto the student doc so the driver can see who to
+    // contact — drivers have no read access to other users' profiles under
+    // the security rules, only to their own bus's student docs.
+    final ownProfile = await _firestore.collection(FirebaseCollections.users).doc(_uid).get();
+    final parentName = ownProfile.data()?['name'] as String? ?? '';
+    final parentPhone = ownProfile.data()?['phone'] as String? ?? '';
+
     await _firestore.collection(FirebaseCollections.students).add({
       'name': fullName.trim(),
       'grade': grade.trim(),
@@ -76,6 +83,8 @@ class FirestoreParentRepository implements ParentRepository {
       'parentId': _uid,
       'status': 'pending',
       'requestedStop': requestedStop.trim(),
+      'parentName': parentName,
+      'parentPhone': parentPhone,
       'createdAt': FieldValue.serverTimestamp(),
     });
   }
