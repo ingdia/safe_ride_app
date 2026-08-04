@@ -40,6 +40,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         );
   }
 
+  Future<void> _onGoogleSignUp() async {
+    // Firebase's signInWithCredential creates the account automatically on
+    // first use, so this is the same call login uses — there's no separate
+    // "register with Google" step.
+    await ref.read(authProvider.notifier).loginWithGoogle();
+  }
+
   @override
   Widget build(BuildContext context) {
     ref.listen<AuthState>(authProvider, (_, state) {
@@ -57,6 +64,17 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           ),
         );
         ref.read(authProvider.notifier).clearError();
+      } else if (state is AuthRegistrationPendingVerification) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Account created! Check your email to verify it, then sign in.',
+            ),
+            backgroundColor: ParentUiColors.orange,
+            duration: Duration(seconds: 5),
+          ),
+        );
+        Navigator.pop(context);
       }
     });
 
@@ -80,6 +98,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 passwordController: _passwordController,
                 confirmPasswordController: _confirmPasswordController,
                 onRegister: _onRegister,
+                onGoogleSignUp: _onGoogleSignUp,
                 isLoading: isLoading,
               ),
               const SizedBox(height: ParentUiSpacing.lg),
@@ -151,6 +170,7 @@ class _RegisterCard extends StatelessWidget {
     required this.passwordController,
     required this.confirmPasswordController,
     required this.onRegister,
+    required this.onGoogleSignUp,
     required this.isLoading,
   });
 
@@ -160,6 +180,7 @@ class _RegisterCard extends StatelessWidget {
   final TextEditingController passwordController;
   final TextEditingController confirmPasswordController;
   final VoidCallback onRegister;
+  final VoidCallback onGoogleSignUp;
   final bool isLoading;
 
   @override
@@ -214,6 +235,32 @@ class _RegisterCard extends StatelessWidget {
               label: 'Create account',
               onPressed: onRegister,
               isLoading: isLoading,
+            ),
+            const SizedBox(height: ParentUiSpacing.md),
+            SizedBox(
+              width: double.infinity,
+              height: 54,
+              child: OutlinedButton.icon(
+                onPressed: isLoading ? null : onGoogleSignUp,
+                icon: const Icon(
+                  Icons.login,
+                  color: ParentUiColors.orange,
+                ),
+                label: Text(
+                  'Continue with Google',
+                  style: ParentUiTextStyles.body.copyWith(
+                    color: ParentUiColors.orange,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: ParentUiColors.orange),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(ParentUiRadius.md),
+                  ),
+                  backgroundColor: Colors.white,
+                ),
+              ),
             ),
           ],
         ),

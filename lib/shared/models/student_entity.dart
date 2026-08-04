@@ -17,6 +17,8 @@ class StudentEntity {
     this.driverPhone,
     this.busNumber,
     this.requestedStop,
+    this.parentName,
+    this.parentPhone,
   });
 
   final String id;
@@ -37,6 +39,12 @@ class StudentEntity {
   /// route; not itself an assignment.
   final String? requestedStop;
 
+  /// Denormalized from the parent's own `users/{parentId}` doc at student
+  /// creation time — so a driver (who has no read access to other users'
+  /// profiles under the security rules) can still see who to call.
+  final String? parentName;
+  final String? parentPhone;
+
   bool get isApproved => status == StudentStatus.approved;
   bool get isPending => status == StudentStatus.pending;
 
@@ -56,6 +64,8 @@ class StudentEntity {
       driverPhone: d['driverPhone'] as String?,
       busNumber: d['busNumber'] as String?,
       requestedStop: d['requestedStop'] as String?,
+      parentName: d['parentName'] as String?,
+      parentPhone: d['parentPhone'] as String?,
     );
   }
 

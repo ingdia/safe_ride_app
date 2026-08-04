@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:safe_ride_app/main.dart';
 import 'package:safe_ride_app/features/driver/domain/models/student.dart';
-import 'package:safe_ride_app/features/driver/presentation/providers/driver_navigation_provider.dart';
 import 'package:safe_ride_app/features/driver/presentation/providers/driver_profile_provider.dart';
 import 'package:safe_ride_app/features/driver/presentation/providers/driver_route_provider.dart';
 import 'package:safe_ride_app/features/driver/presentation/providers/driver_route_state.dart';

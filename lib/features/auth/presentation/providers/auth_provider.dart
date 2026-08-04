@@ -37,6 +37,10 @@ class AuthPasswordResetSent extends AuthState {
   const AuthPasswordResetSent();
 }
 
+class AuthRegistrationPendingVerification extends AuthState {
+  const AuthRegistrationPendingVerification();
+}
+
 // ---------------------------------------------------------------------------
 // Notifier
 // ---------------------------------------------------------------------------
@@ -92,9 +96,7 @@ class AuthNotifier extends Notifier<AuthState> {
         email: email,
         password: password,
       );
-      state = const AuthError(
-        'Verification email sent. Please verify your account and sign in.',
-      );
+      state = const AuthRegistrationPendingVerification();
     } on AuthException catch (e) {
       state = AuthError(e.message);
     }

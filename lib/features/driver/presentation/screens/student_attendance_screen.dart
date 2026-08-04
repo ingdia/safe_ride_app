@@ -7,6 +7,7 @@ import '../../../../core/theme/app_text_styles.dart';
 import '../../domain/models/student.dart';
 import '../providers/driver_route_provider.dart';
 import '../providers/driver_route_state.dart';
+import '../widgets/offline_data_banner.dart';
 
 class StudentAttendanceScreen extends ConsumerWidget {
   const StudentAttendanceScreen({super.key});
@@ -152,6 +153,10 @@ class _LiveRosterBody extends ConsumerWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.md, AppSpacing.md, AppSpacing.xxl),
       children: [
+        if (loaded.isOffline) ...[
+          const OfflineDataBanner(),
+          const SizedBox(height: AppSpacing.sm),
+        ],
         _buildHeader(),
         if (isLive) ...
           [
@@ -260,6 +265,25 @@ class _StudentListItem extends StatelessWidget {
                   Text(student.name, style: AppTextStyles.bodyMedium),
                   const SizedBox(height: 2),
                   Text('${student.stopName} • ${student.grade}', style: AppTextStyles.bodySmall),
+                  if ((student.parentName ?? '').isNotEmpty || (student.parentPhone ?? '').isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        Icon(Icons.phone_outlined, size: 12, color: AppColors.textSecondary),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            [
+                              if ((student.parentName ?? '').isNotEmpty) student.parentName,
+                              if ((student.parentPhone ?? '').isNotEmpty) student.parentPhone,
+                            ].join(' • '),
+                            style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),

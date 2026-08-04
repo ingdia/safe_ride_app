@@ -122,16 +122,25 @@ class DriverStreamService {
         );
   }
 
-  /// Returns a live stream of [Student]s assigned to [busId], ordered by
-  /// `stopName` then `name`.
+  /// Returns a live stream of *approved* [Student]s assigned to [busId],
+  /// ordered by `stopName` then `name`.
   ///
   /// Listens to the top-level `students` collection filtered by
   /// `busId == busId` — not `routeId`, because the `students` security rule
   /// only grants a driver read access via `resource.data.busId ==
   /// myBusId()`; a query filtered on `routeId` doesn't match any branch of
-  /// that rule and Firestore rejects it outright. Re-emits the full list on
-  /// every Firestore change, allowing the UI to reflect Admin roster edits
-  /// (add / remove student) mid-trip without a manual refresh.
+  /// that rule and Firestore rejects it outright. Also filters
+  /// `status == 'approved'`, matching [FirestoreDriverRepository.
+  /// fetchRouteStudents] — without this, a student the admin left pending or
+  /// rejected would show up here (this stream) but not there (the initial
+  /// load), so the roster a driver sees would depend on which screen/timing
+  /// won the race, not on what the admin actually approved. Sorted
+  /// client-side rather than via `orderBy()` — multiple equality (`==`)
+  /// filters alone don't need a composite index in Firestore, but adding
+  /// `orderBy` on different fields would, and that index isn't guaranteed to
+  /// exist/deployed. Re-emits the full list on every Firestore change,
+  /// allowing the UI to reflect Admin roster edits (add / remove student)
+  /// mid-trip without a manual refresh.
   ///
   /// Emits an empty list when no students match. Any [FirebaseException] is
   /// caught and re-thrown so Riverpod surfaces it as [AsyncError].
@@ -139,12 +148,21 @@ class DriverStreamService {
     return _firestore
         .collection('students')
         .where(DriverFirestoreFields.busId, isEqualTo: busId)
-        .orderBy('stopName')
-        .orderBy('name')
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => _studentFromDoc(doc))
-            .toList())
+        .map((snapshot) {
+          final students = snapshot.docs
+              .where((doc) {
+                final status = doc.data()['status'] as String?;
+                return status == null || status == 'approved' || status == 'active';
+              })
+              .map((doc) => _studentFromDoc(doc))
+              .toList()
+            ..sort((a, b) {
+              final stopCompare = a.stopName.compareTo(b.stopName);
+              return stopCompare != 0 ? stopCompare : a.name.compareTo(b.name);
+            });
+          return students;
+        })
         .handleError(
           (Object error, StackTrace stack) {
             Error.throwWithStackTrace(error, stack);
@@ -165,6 +183,8 @@ class DriverStreamService {
       stopName: (data['stopName'] as String?) ?? (data['routeStop'] as String?) ?? '',
       grade: (data['grade'] as String?) ?? '',
       status: _statusFromString(statusStr),
+      parentName: data['parentName'] as String?,
+      parentPhone: data['parentPhone'] as String?,
     );
   }
 
