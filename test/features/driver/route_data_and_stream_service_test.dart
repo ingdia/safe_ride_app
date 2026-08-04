@@ -25,6 +25,7 @@ Map<String, dynamic> _routeDoc({
       'driverId': driverId,
       'status': status,
       'scheduledTime': scheduledTime,
+      // ignore: use_null_aware_elements
       if (etaMinutes != null) 'etaMinutes': etaMinutes,
       'stops': stops ??
           [
@@ -71,13 +72,16 @@ Map<String, dynamic> _studentDoc({
   String grade = 'P3',
   String attendanceStatus = 'notBoarded',
   String busId = 'bus_001',
+  String status = 'approved',
 }) =>
     {
       'name': name,
       'stopName': stopName,
       'grade': grade,
-      // Distinct from `status`, which holds the school-approval state
-      // (pending/approved/rejected) — attendance marks must never touch it.
+      // Distinct from `attendanceStatus` — this is the school-approval
+      // state (pending/approved/rejected). studentsStream only returns
+      // approved students, matching FirestoreDriverRepository.fetchRouteStudents.
+      'status': status,
       'attendanceStatus': attendanceStatus,
       DriverFirestoreFields.busId: busId,
     };
@@ -92,7 +96,7 @@ void main() {
 
     setUp(() => fakeFirestore = FakeFirebaseFirestore());
 
-    Future<DocumentSnapshot<Map<String, dynamic>>> _seedAndGet(
+    Future<DocumentSnapshot<Map<String, dynamic>>> seedAndGet(
       Map<String, dynamic> data, {
       String docId = 'route_001',
     }) async {
@@ -107,7 +111,7 @@ void main() {
     }
 
     test('parses all scalar fields correctly', () async {
-      final snap = await _seedAndGet(_routeDoc());
+      final snap = await seedAndGet(_routeDoc());
       final route = RouteData.fromFirestore(snap);
 
       expect(route.routeId, 'route_001');
@@ -121,7 +125,7 @@ void main() {
 
     test('stops are sorted by order field ascending', () async {
       // Seed with order 2 before order 1 — parser must sort them.
-      final snap = await _seedAndGet(_routeDoc());
+      final snap = await seedAndGet(_routeDoc());
       final route = RouteData.fromFirestore(snap);
 
       expect(route.stops, hasLength(2));
@@ -132,7 +136,7 @@ void main() {
     });
 
     test('stop status strings map to correct RouteStopStatus values', () async {
-      final snap = await _seedAndGet(_routeDoc(stops: [
+      final snap = await seedAndGet(_routeDoc(stops: [
         {'order': 1, 'name': 'A', 'studentCount': 1, 'time': '7:00', 'status': 'completed', 'isDestination': false},
         {'order': 2, 'name': 'B', 'studentCount': 1, 'time': '7:10', 'status': 'current', 'isDestination': false},
         {'order': 3, 'name': 'C', 'studentCount': 1, 'time': '7:20', 'status': 'upcoming', 'isDestination': false},
@@ -145,7 +149,7 @@ void main() {
     });
 
     test('unknown status string defaults to RouteStatus.scheduled', () async {
-      final snap = await _seedAndGet(_routeDoc(status: 'unknown_value'));
+      final snap = await seedAndGet(_routeDoc(status: 'unknown_value'));
       expect(RouteData.fromFirestore(snap).status, RouteStatus.scheduled);
     });
 
@@ -156,7 +160,7 @@ void main() {
         ('completed', RouteStatus.completed),
         ('cancelled', RouteStatus.cancelled),
       ]) {
-        final snap = await _seedAndGet(_routeDoc(status: pair.$1), docId: pair.$1);
+        final snap = await seedAndGet(_routeDoc(status: pair.$1), docId: pair.$1);
         expect(RouteData.fromFirestore(snap).status, pair.$2,
             reason: 'status "${pair.$1}" should parse to ${pair.$2}');
       }
@@ -164,7 +168,7 @@ void main() {
 
     test('missing optional fields fall back to safe defaults', () async {
       // Minimal document — only required Firestore ID, no other fields.
-      final snap = await _seedAndGet({});
+      final snap = await seedAndGet({});
       final route = RouteData.fromFirestore(snap);
 
       expect(route.name, '');
@@ -177,18 +181,18 @@ void main() {
     });
 
     test('etaMinutes is null when field is absent', () async {
-      final snap = await _seedAndGet(_routeDoc(etaMinutes: null));
+      final snap = await seedAndGet(_routeDoc(etaMinutes: null));
       expect(RouteData.fromFirestore(snap).etaMinutes, isNull);
     });
 
     test('stops list is empty when field is absent', () async {
       final data = Map<String, dynamic>.from(_routeDoc())..remove('stops');
-      final snap = await _seedAndGet(data);
+      final snap = await seedAndGet(data);
       expect(RouteData.fromFirestore(snap).stops, isEmpty);
     });
 
     test('toMap round-trips through fromFirestore', () async {
-      final snap = await _seedAndGet(_routeDoc());
+      final snap = await seedAndGet(_routeDoc());
       final original = RouteData.fromFirestore(snap);
 
       // Write toMap output back and re-parse.
@@ -212,7 +216,7 @@ void main() {
     });
 
     test('copyWith replaces only the supplied fields', () async {
-      final snap = await _seedAndGet(_routeDoc());
+      final snap = await seedAndGet(_routeDoc());
       final original = RouteData.fromFirestore(snap);
       final copy = original.copyWith(name: 'Route B', etaMinutes: 5);
 
@@ -226,7 +230,7 @@ void main() {
     });
 
     test('isDestination flag is parsed correctly', () async {
-      final snap = await _seedAndGet(_routeDoc(stops: [
+      final snap = await seedAndGet(_routeDoc(stops: [
         {'order': 1, 'name': 'School', 'studentCount': 0, 'time': '8:00', 'status': 'upcoming', 'isDestination': true},
       ]));
       expect(RouteData.fromFirestore(snap).stops.first.isDestination, isTrue);
@@ -480,6 +484,7 @@ void main() {
         'name': 'Alice',
         'routeStop': 'Kigali Heights',
         'grade': 'P4',
+        'status': 'approved',
         'attendanceStatus': 'notBoarded',
         DriverFirestoreFields.busId: busId,
       });
