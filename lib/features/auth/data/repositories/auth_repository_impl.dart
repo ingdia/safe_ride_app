@@ -78,7 +78,9 @@ class AuthRepositoryImpl implements AuthRepository {
         });
       }
 
-      return await _buildAuthUser(firebaseUser);
+      // Google accounts are inherently email-verified by Google, so skip
+      // the app's own email-verification gate.
+      return await _buildAuthUser(firebaseUser, isGoogleSignIn: true);
     } on FirebaseAuthException catch (error) {
       throw AuthException(_mapFirebaseAuthError(error));
     } catch (error) {
@@ -175,7 +177,7 @@ class AuthRepositoryImpl implements AuthRepository {
     }
   }
 
-  Future<AuthUser> _buildAuthUser(User firebaseUser) async {
+  Future<AuthUser> _buildAuthUser(User firebaseUser, {bool isGoogleSignIn = false}) async {
     // The super admin is identified purely by email (see SuperAdminConfig) —
     // no Firestore role/schoolId doc is required, and none of the
     // parent/driver gates below apply to them.
@@ -201,7 +203,8 @@ class AuthRepositoryImpl implements AuthRepository {
     // Only parents self-register, so only parents need the anti-abuse email
     // verification step. Driver/admin accounts are created directly by an
     // administrator and have no self-service verification path.
-    if (role == UserRole.parent && !firebaseUser.emailVerified) {
+    // Google sign-in users are already verified by Google, so skip the check.
+    if (role == UserRole.parent && !isGoogleSignIn && !firebaseUser.emailVerified) {
       throw const AuthException(
         'Please verify your email before signing in.',
       );
@@ -238,6 +241,12 @@ class AuthRepositoryImpl implements AuthRepository {
         return 'This account has been disabled.';
       case 'user-not-found':
       case 'wrong-password':
+      // Modern Firebase Auth returns this generic code for both a wrong
+      // email/password combo AND some Google credential failures — it
+      // deliberately doesn't distinguish "no such account" from "wrong
+      // password" (anti-enumeration). The message has to stay generic
+      // enough to cover both cases correctly.
+      case 'invalid-credential':
         return 'Invalid email or password.';
       case 'email-already-in-use':
         return 'An account already exists with this email.';
@@ -245,8 +254,6 @@ class AuthRepositoryImpl implements AuthRepository {
         return 'Please choose a stronger password.';
       case 'account-exists-with-different-credential':
         return 'An account already exists with a different sign-in method.';
-      case 'invalid-credential':
-        return 'Unable to sign in with Google. Please try again.';
       default:
         return error.message ?? 'Authentication failed. Please try again.';
     }
