@@ -1,28 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/routing/auth_routes.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../domain/models/route_stop.dart';
+import '../providers/driver_navigation_provider.dart';
+import '../providers/driver_profile_provider.dart';
 import '../providers/driver_route_provider.dart';
 import '../providers/driver_route_state.dart';
+import '../widgets/offline_data_banner.dart';
 import 'offline_attendance_screen.dart';
 
 /// Driver's "Today's Route" screen.
 ///
 /// Shows the driver a summary of today's route plus the list of stops
-/// they'll make, and lets them start the route (kicks off GPS/navigation
-/// per the Driver Action user-flow, Fig. 5).
-///
-/// NOTE: Data is currently static/mocked. This will be wired to
-/// `DriverRouteBloc` in Task 2 (feature/driver-bloc) — see the TODOs below.
+/// they'll make, and lets them start the route (kicks off GPS/navigation).
 class TodaysRouteScreen extends ConsumerWidget {
   const TodaysRouteScreen({super.key});
-
-  // TODO(Task 2): Replace with real route metadata from the bloc when available.
-  static const String _routeName = 'Route A';
-  static const String _busNumber = 'Bus #12';
 
   int _totalStudents(List<RouteStop> stops) =>
       stops.fold(0, (sum, stop) => sum + stop.studentCount);
@@ -30,6 +27,10 @@ class TodaysRouteScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(driverRouteProvider);
+    final profile = ref.watch(driverProfileProvider).maybeWhen(
+          data: (p) => p,
+          orElse: () => null,
+        );
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -71,13 +72,25 @@ class TodaysRouteScreen extends ConsumerWidget {
 
             return CustomScrollView(
               slivers: [
-                SliverToBoxAdapter(child: _buildHeader(context)),
+                SliverToBoxAdapter(child: _buildHeader(context, ref)),
+                if (loadedState.isOffline)
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.md,
+                      AppSpacing.sm,
+                      AppSpacing.md,
+                      0,
+                    ),
+                    sliver: const SliverToBoxAdapter(child: OfflineDataBanner()),
+                  ),
                 SliverToBoxAdapter(
                   child: _buildRouteSummaryCard(
                     context,
                     stops,
                     progress: progress,
                     gpsStatus: loadedState.gpsStatus,
+                    busNumber: profile?.busNumber ?? 'Unassigned',
+                    routeName: profile?.route ?? 'No route assigned',
                   ),
                 ),
                 SliverToBoxAdapter(child: _buildStopsHeader(context, stops)),
@@ -124,7 +137,7 @@ class TodaysRouteScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
+  Widget _buildHeader(BuildContext context, WidgetRef ref) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.md,
@@ -156,7 +169,7 @@ class TodaysRouteScreen extends ConsumerWidget {
             shape: const CircleBorder(),
             clipBehavior: Clip.antiAlias,
             child: InkWell(
-              onTap: () => _showProfileMenu(context),
+              onTap: () => _showProfileMenu(context, ref),
               child: CircleAvatar(
                 radius: 22,
                 backgroundColor: AppColors.primary.withValues(alpha: 0.15),
@@ -174,6 +187,8 @@ class TodaysRouteScreen extends ConsumerWidget {
     List<RouteStop> stops, {
     required int progress,
     required String gpsStatus,
+    required String busNumber,
+    required String routeName,
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
@@ -203,13 +218,13 @@ class TodaysRouteScreen extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      _busNumber,
+                      busNumber,
                       style: AppTextStyles.headingSmall.copyWith(
                         color: Colors.white,
                       ),
                     ),
                     Text(
-                      _routeName,
+                      routeName,
                       style: AppTextStyles.bodySmall.copyWith(
                         color: Colors.white.withValues(alpha: 0.9),
                       ),
@@ -363,8 +378,6 @@ class TodaysRouteScreen extends ConsumerWidget {
     );
   }
 
-  // TODO(Task 2): Replace with real navigation to a stop-detail /
-  // student-manifest screen once DriverRouteBloc is wired up.
   void _showStopDetails(BuildContext context, RouteStop stop) {
     showModalBottomSheet(
       context: context,
@@ -423,7 +436,7 @@ class TodaysRouteScreen extends ConsumerWidget {
   }
 
   // TODO(Task 2): Wire to real profile/settings/logout actions.
-  void _showProfileMenu(BuildContext context) {
+  void _showProfileMenu(BuildContext context, WidgetRef ref) {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -439,17 +452,25 @@ class TodaysRouteScreen extends ConsumerWidget {
               ListTile(
                 leading: const Icon(Icons.person_outline),
                 title: const Text('Profile'),
-                onTap: () => Navigator.pop(context),
-              ),
-              ListTile(
-                leading: const Icon(Icons.settings_outlined),
-                title: const Text('Settings'),
-                onTap: () => Navigator.pop(context),
+                onTap: () {
+                  Navigator.pop(context);
+                  ref.read(driverNavigationProvider.notifier).selectTab(5);
+                },
               ),
               ListTile(
                 leading: const Icon(Icons.logout_rounded),
                 title: const Text('Log out'),
-                onTap: () => Navigator.pop(context),
+                onTap: () async {
+                  Navigator.pop(context);
+                  await ref.read(authProvider.notifier).signOut();
+                  if (context.mounted) {
+                    Navigator.pushNamedAndRemoveUntil(
+                      context,
+                      AuthRoutes.login,
+                      (_) => false,
+                    );
+                  }
+                },
               ),
             ],
           ),

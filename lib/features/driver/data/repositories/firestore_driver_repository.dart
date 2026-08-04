@@ -47,22 +47,45 @@ class FirestoreDriverRepository implements DriverRepository {
       final data = userDoc.data();
       final busId = data?['busId'] as String?;
       final schoolId = data?['schoolId'] as String?;
+      var routeId = data?['routeId'] as String?;
+
       if (busId == null || busId.isEmpty) return {'schoolId': schoolId};
 
-      // The `routes` rule gates reads on `schoolId`, so the query must
-      // filter on it explicitly — filtering by `busId` alone is rejected
-      // outright by Firestore, not just empty.
-      final routeQuery = await _firestore
-          .collection(DriverFirestorePaths.routes)
-          .where('schoolId', isEqualTo: schoolId)
-          .where('busId', isEqualTo: busId)
-          .limit(1)
-          .get();
+      // 1. Try resolving routeId from the bus document if not on user doc
+      if (routeId == null || routeId.isEmpty) {
+        final busDoc = await _firestore.collection(DriverFirestorePaths.buses).doc(busId).get();
+        routeId = busDoc.data()?['routeId'] as String?;
+      }
+
+      // 2. Try querying routes by schoolId & busId
+      if (routeId == null || routeId.isEmpty) {
+        final routeQuery = await _firestore
+            .collection(DriverFirestorePaths.routes)
+            .where('schoolId', isEqualTo: schoolId)
+            .where('busId', isEqualTo: busId)
+            .limit(1)
+            .get();
+        if (routeQuery.docs.isNotEmpty) {
+          routeId = routeQuery.docs.first.id;
+        }
+      }
+
+      // 3. Fallback: try finding any route for this school
+      if ((routeId == null || routeId.isEmpty) && schoolId != null && schoolId.isNotEmpty) {
+        final schoolRouteQuery = await _firestore
+            .collection(DriverFirestorePaths.routes)
+            .where('schoolId', isEqualTo: schoolId)
+            .limit(1)
+            .get();
+        if (schoolRouteQuery.docs.isNotEmpty) {
+          routeId = schoolRouteQuery.docs.first.id;
+        }
+      }
 
       return {
         'busId': busId,
         'schoolId': schoolId,
-        'routeId': routeQuery.docs.isNotEmpty ? routeQuery.docs.first.id : null,
+        'routeId': routeId,
         'driverId': uid,
       };
     } catch (_) {
@@ -102,10 +125,15 @@ class FirestoreDriverRepository implements DriverRepository {
       final snapshot = await _firestore
           .collection(FirebaseCollections.students)
           .where('busId', isEqualTo: busId)
-          .where('status', isEqualTo: 'approved')
           .get();
 
-      return snapshot.docs.map(_mapStudentFromDoc).toList();
+      return snapshot.docs
+          .where((doc) {
+            final status = doc.data()['status'] as String?;
+            return status == null || status == 'approved' || status == 'active';
+          })
+          .map(_mapStudentFromDoc)
+          .toList();
     } catch (_) {
       return <Student>[];
     }
@@ -186,27 +214,29 @@ class FirestoreDriverRepository implements DriverRepository {
 
     final statusValue = _attendanceStatusToString(status);
 
-    try {
-      if (tripId != null && tripId.isNotEmpty) {
-        await _firestore.collection(FirebaseCollections.trips).doc(tripId).update({
-          'studentEvents.$studentId': statusValue == 'boarded' ? 'boarded' : 'droppedOff',
-        });
-      }
-
-      // Note: uses a distinct `attendanceStatus` field, not `status` — the
-      // `status` field on a student doc means pending/approved/rejected
-      // (school-approval state) and must never be overwritten here.
-      final studentDocRef = _firestore.collection(FirebaseCollections.students).doc(studentId);
-      final studentSnapshot = await studentDocRef.get();
-      if (studentSnapshot.exists) {
-        await studentDocRef.update({'attendanceStatus': statusValue});
-        return _mapStudentFromDoc(await studentDocRef.get());
-      }
-
-      return Student(id: studentId, name: '', stopName: '', grade: '', status: status);
-    } catch (_) {
-      return Student(id: studentId, name: '', stopName: '', grade: '', status: status);
+    // Deliberately no try/catch here — the caller (DriverRouteNotifier)
+    // needs a thrown exception to detect a failed write and queue it for
+    // offline retry. Swallowing errors here and returning a stub Student
+    // used to make every failure look like a success, silently losing the
+    // attendance mark with no retry and no visible sign anything went
+    // wrong.
+    if (tripId != null && tripId.isNotEmpty) {
+      await _firestore.collection(FirebaseCollections.trips).doc(tripId).update({
+        'studentEvents.$studentId': statusValue == 'boarded' ? 'boarded' : 'droppedOff',
+      });
     }
+
+    // Note: uses a distinct `attendanceStatus` field, not `status` — the
+    // `status` field on a student doc means pending/approved/rejected
+    // (school-approval state) and must never be overwritten here.
+    final studentDocRef = _firestore.collection(FirebaseCollections.students).doc(studentId);
+    final studentSnapshot = await studentDocRef.get();
+    if (!studentSnapshot.exists) {
+      throw StateError('Student $studentId no longer exists.');
+    }
+
+    await studentDocRef.update({'attendanceStatus': statusValue});
+    return _mapStudentFromDoc(await studentDocRef.get());
   }
 
   @override
@@ -236,6 +266,8 @@ class FirestoreDriverRepository implements DriverRepository {
     final time = (data['time'] as String?) ?? '';
     final statusStr = (data['status'] as String?) ?? 'upcoming';
     final isDestination = (data['isDestination'] is bool) ? (data['isDestination'] as bool) : false;
+    final lat = (data['lat'] is num) ? (data['lat'] as num).toDouble() : null;
+    final lng = (data['lng'] is num) ? (data['lng'] as num).toDouble() : null;
 
     RouteStopStatus status;
     if (statusStr == 'completed') {
@@ -253,6 +285,8 @@ class FirestoreDriverRepository implements DriverRepository {
       time: time,
       status: status,
       isDestination: isDestination,
+      lat: lat,
+      lng: lng,
     );
   }
 
@@ -263,6 +297,8 @@ class FirestoreDriverRepository implements DriverRepository {
     final stopName = (data['stopName'] as String?) ?? '';
     final grade = (data['grade'] as String?) ?? '';
     final statusStr = (data['attendanceStatus'] as String?) ?? 'notBoarded';
+    final parentName = data['parentName'] as String?;
+    final parentPhone = data['parentPhone'] as String?;
 
     return Student(
       id: id,
@@ -270,6 +306,8 @@ class FirestoreDriverRepository implements DriverRepository {
       stopName: stopName,
       grade: grade,
       status: _attendanceStatusFromString(statusStr),
+      parentName: parentName,
+      parentPhone: parentPhone,
     );
   }
 

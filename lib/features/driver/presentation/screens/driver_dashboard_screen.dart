@@ -15,6 +15,7 @@ import '../providers/driver_navigation_provider.dart';
 import '../providers/driver_profile_provider.dart';
 import '../providers/driver_route_provider.dart';
 import '../providers/driver_route_state.dart';
+import '../widgets/offline_data_banner.dart';
 
 /// The driver's own completed trips — most recent first. Resolves their
 /// busId from their own user doc rather than threading it through
@@ -155,6 +156,10 @@ class _DriverDashboardScreenState
             return ListView(
               padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.md, AppSpacing.md, AppSpacing.xxl),
               children: [
+                if (loaded.isOffline) ...[
+                  const OfflineDataBanner(),
+                  const SizedBox(height: AppSpacing.sm),
+                ],
                 _HeaderCard(
                   profile: profile,
                   routeName: profile.route,

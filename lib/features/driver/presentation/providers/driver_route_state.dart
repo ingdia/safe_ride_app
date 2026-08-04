@@ -24,6 +24,7 @@ class DriverRouteLoaded extends DriverRouteState {
     this.gpsStatus = 'Waiting for GPS',
     this.lastGpsUpdateAt,
     this.stopsCompleted = const {},
+    this.isOffline = false,
   });
 
   final List<RouteStop> stops;
@@ -41,6 +42,13 @@ class DriverRouteLoaded extends DriverRouteState {
   /// Stop names the driver has explicitly marked as passed on the active
   /// trip — mirrors `trips/{tripId}.stopsCompleted` in Firestore.
   final Set<String> stopsCompleted;
+
+  /// True only when [DriverRouteNotifier] fell back to [MockDriverRepository]
+  /// because the device is genuinely offline — never true just because
+  /// [stops]/[students] happen to be empty on real data. Screens must show
+  /// this explicitly so a driver (or anyone reviewing the app) can never
+  /// mistake demo/offline data for what's actually in Firestore.
+  final bool isOffline;
 
   bool get isTripActive => tripId != null && tripId!.isNotEmpty;
 }

@@ -158,11 +158,13 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
         ),
         lastGpsUpdateAt: currentState.lastGpsUpdateAt,
         stopsCompleted: _stopsCompleted,
+        isOffline: !_online,
       ),
     );
   }
 
   Future<DriverRouteState> _loadRoute({required bool isOnline}) async {
+    _online = isOnline;
     final cacheService = ref.read(attendanceCacheProvider);
     final repository = _repositoryForConnectivity(isOnline);
     _repository = repository;
@@ -247,6 +249,7 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
       routeProgress: progress,
       gpsStatus: _gpsStatusFor(progress: progress),
       stopsCompleted: _stopsCompleted,
+      isOffline: !_online,
     );
   }
 
@@ -310,16 +313,31 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
               tripId: _tripId,
             )
             .timeout(const Duration(seconds: 8));
+        await cacheService.deleteRecord(updatedStudent.id);
       } catch (_) {
-        _repository = MockDriverRepository();
-        updatedStudent = await _repository.updateStudentAttendanceStatus(
-          studentId,
-          status,
-          routeId: '',
-          busId: '',
+        // The write itself failed or timed out — a transient
+        // Firestore/network problem, not "device offline" (connectivityProvider
+        // said online, that's how we got into this branch at all). Treat it
+        // the same as the offline path: apply the change locally and queue
+        // it for retry via the existing cache/sync mechanism, instead of
+        // silently discarding it or permanently swapping every future write
+        // this session to the mock repository (which used to happen here —
+        // it meant one transient error made every subsequent write for the
+        // rest of the session silently go nowhere, with no visible sign of
+        // it, since this failure isn't what OfflineDataBanner tracks).
+        updatedStudent = currentStudent.copyWith(status: status);
+        await cacheService.saveRecord(
+          CachedAttendanceRecord(
+            studentId: updatedStudent.id,
+            studentName: updatedStudent.name,
+            stopName: updatedStudent.stopName,
+            statusIndex: updatedStudent.status.index,
+            recordedAt: DateTime.now(),
+            synced: false,
+            routeId: _routeId ?? '',
+          ),
         );
       }
-      await cacheService.deleteRecord(updatedStudent.id);
     }
 
     final updatedStudents = currentState.students
@@ -347,6 +365,7 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
         ),
         lastGpsUpdateAt: currentState.lastGpsUpdateAt,
         stopsCompleted: _stopsCompleted,
+        isOffline: !_online,
       ),
     );
   }
@@ -371,6 +390,7 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
         gpsStatus: currentState.gpsStatus,
         lastGpsUpdateAt: currentState.lastGpsUpdateAt,
         stopsCompleted: _stopsCompleted,
+        isOffline: !_online,
       ),
     );
 
@@ -415,6 +435,7 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
           routeProgress: currentState.routeProgress,
           gpsStatus: 'Trip started',
           stopsCompleted: _stopsCompleted,
+          isOffline: !_online,
         ),
       );
     } catch (_) {
@@ -445,6 +466,7 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
           routeProgress: currentState.routeProgress,
           gpsStatus: 'Trip completed',
           stopsCompleted: _stopsCompleted,
+          isOffline: !_online,
         ),
       );
     } catch (_) {
@@ -517,6 +539,7 @@ class DriverRouteNotifier extends AsyncNotifier<DriverRouteState> {
           ),
           lastGpsUpdateAt: now,
           stopsCompleted: _stopsCompleted,
+          isOffline: !_online,
         ),
       );
     } catch (_) {

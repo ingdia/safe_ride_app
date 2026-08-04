@@ -1,28 +1,45 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:latlong2/latlong.dart' as latlong;
 
+import '../../../../core/firebase/firebase_collections.dart';
 import '../../domain/models/route_stop.dart';
 import '../providers/driver_route_provider.dart';
 import '../providers/driver_route_state.dart';
+import '../widgets/offline_data_banner.dart';
 
 /// -----------------------------------------------------------------------
 /// DriverMapScreen
 ///
 /// Matches the "Live Map" screen from the Figma prototype:
 ///   - Orange/amber header ("Live Map" / "Real-time bus tracking")
-///   - Live map card (placeholder until real map/GPS integration lands)
+///   - Live map card (flutter_map + OpenStreetMap, showing route stops and
+///     the driver's own broadcast position from busLocations/{busId})
 ///   - "Route Stops" list with numbered stop badges + status chips
 ///     (Completed / Current / Upcoming)
 ///
-/// This widget is the SCREEN CONTENT ONLY. It is meant to be wrapped
-/// inside Diane's `BottomNavBarShell` (per Task 1 instructions) alongside
-/// the "Today's Route" and "Student Attendance List" screens — do not add
-/// a bottom nav bar here, the shell already provides it.
-///
-/// Data is currently mocked. In Task 2 (Driver BLoC & Mock Repositories),
-/// replace `_stops` with state coming from the DriverBloc so this becomes
-/// fully interactive.
+/// This widget is the SCREEN CONTENT ONLY — it's rendered inside the
+/// driver's bottom-nav shell, which already provides navigation.
 /// -----------------------------------------------------------------------
+
+/// Live-streams the driver's own bus position from `busLocations/{busId}` —
+/// the same doc [FirestoreDriverRepository.updateBusLocation] writes to
+/// while a trip is active.
+final _ownBusLocationProvider =
+    StreamProvider.autoDispose.family<latlong.LatLng?, String>((ref, busId) {
+  if (busId.isEmpty) return Stream.value(null);
+  return FirebaseFirestore.instance
+      .collection(FirebaseCollections.busLocations)
+      .doc(busId)
+      .snapshots()
+      .map((doc) {
+    final data = doc.data();
+    if (data == null || data['lat'] is! num || data['lng'] is! num) return null;
+    return latlong.LatLng((data['lat'] as num).toDouble(), (data['lng'] as num).toDouble());
+  });
+});
 
 class DriverMapScreen extends ConsumerStatefulWidget {
   const DriverMapScreen({super.key});
@@ -74,7 +91,11 @@ class _DriverMapScreenState extends ConsumerState<DriverMapScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         children: [
                           const SizedBox(height: 16),
-                          _buildMapPlaceholder(loadedState),
+                          if (loadedState.isOffline) ...[
+                            const OfflineDataBanner(),
+                            const SizedBox(height: 12),
+                          ],
+                          _buildMap(loadedState),
                           const SizedBox(height: 24),
                           _buildStopsHeader(stops),
                           const SizedBox(height: 12),
@@ -133,57 +154,82 @@ class _DriverMapScreenState extends ConsumerState<DriverMapScreen> {
     );
   }
 
-  Widget _buildMapPlaceholder(DriverRouteLoaded loadedState) {
-    // TODO: Swap for a real map widget (google_maps_flutter / flutter_map)
-    // once live GPS coordinates are available from the BLoC layer.
-    return Container(
-      height: 260,
-      decoration: BoxDecoration(
-        color: const Color(0xFFFCE8CF),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Center(
-        child: Container(
-          width: 220,
-          padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.06),
-                blurRadius: 8,
-                offset: const Offset(0, 3),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 56,
-                height: 56, // meets Material min tap target (48dp+)
-                decoration: const BoxDecoration(
-                  color: _amber,
-                  shape: BoxShape.circle,
+  Widget _buildMap(DriverRouteLoaded loadedState) {
+    final stopsWithCoords =
+        loadedState.stops.where((s) => s.lat != null && s.lng != null).toList();
+    final ownLocationAsync =
+        ref.watch(_ownBusLocationProvider(loadedState.busId ?? ''));
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: SizedBox(
+        height: 260,
+        child: ownLocationAsync.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, st) => _mapFallback('Unable to load live position.'),
+          data: (ownLocation) {
+            if (stopsWithCoords.isEmpty && ownLocation == null) {
+              return _mapFallback(
+                loadedState.stops.isEmpty
+                    ? 'No route assigned yet.'
+                    : 'This route\'s stops don\'t have coordinates yet — '
+                        'ask your school admin to set them.',
+              );
+            }
+
+            final center = ownLocation ??
+                latlong.LatLng(stopsWithCoords.first.lat!, stopsWithCoords.first.lng!);
+
+            return FlutterMap(
+              options: MapOptions(initialCenter: center, initialZoom: 13),
+              children: [
+                TileLayer(
+                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  userAgentPackageName: 'com.example.safe_ride_app',
                 ),
-                child: const Icon(Icons.navigation, color: Colors.white, size: 28),
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'Interactive Map View',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                '${loadedState.routeProgress * 100 ~/ 1}% complete • ${loadedState.gpsStatus}',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-              ),
-            ],
-          ),
+                MarkerLayer(
+                  markers: [
+                    for (final stop in stopsWithCoords)
+                      Marker(
+                        point: latlong.LatLng(stop.lat!, stop.lng!),
+                        width: 36,
+                        height: 36,
+                        child: Icon(
+                          Icons.location_on,
+                          color: _statusInfo(stop.status).badgeText,
+                          size: 32,
+                        ),
+                      ),
+                    if (ownLocation != null)
+                      Marker(
+                        point: ownLocation,
+                        width: 40,
+                        height: 40,
+                        child: const Icon(
+                          Icons.directions_bus_filled,
+                          color: _amberDark,
+                          size: 32,
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            );
+          },
         ),
+      ),
+    );
+  }
+
+  Widget _mapFallback(String message) {
+    return Container(
+      color: const Color(0xFFFCE8CF),
+      alignment: Alignment.center,
+      padding: const EdgeInsets.all(24),
+      child: Text(
+        message,
+        textAlign: TextAlign.center,
+        style: TextStyle(color: Colors.grey[700], fontWeight: FontWeight.w600),
       ),
     );
   }

@@ -1,8 +1,5 @@
-/// A single stop on a driver's route.
-///
-/// This is a plain data model for now. In Task 2, instances will come
-/// from `DriverRepository` (mocked) via `DriverRouteBloc` instead of the
-/// static list in [TodaysRouteScreen].
+/// A single stop on a driver's route, sourced live from `DriverRepository`
+/// (Firestore-backed; see [FirestoreDriverRepository]).
 enum RouteStopStatus { completed, current, upcoming }
 
 class RouteStop {
@@ -13,6 +10,8 @@ class RouteStop {
     required this.time,
     required this.status,
     this.isDestination = false,
+    this.lat,
+    this.lng,
   });
 
   final int order;
@@ -21,4 +20,10 @@ class RouteStop {
   final String time;
   final RouteStopStatus status;
   final bool isDestination;
+
+  /// Null when the admin created this stop without coordinates (e.g. via an
+  /// older route entry) — callers must handle that rather than assume every
+  /// stop is mappable.
+  final double? lat;
+  final double? lng;
 }
